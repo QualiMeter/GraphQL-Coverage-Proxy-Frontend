@@ -39,9 +39,12 @@ npm run dev
 GitHub Actions (`.github/workflows/frontend-ci.yml`) запускает для PR и `main`:
 `npm ci`, `npm run lint`, `npm test`, `npm run build`; результат сборки сохраняется как artifact.
 
-Автодеплой на VPS подготовлен, но **выключен**, пока приложение использует mock-данные:
-он требует явно установленную repository variable `FRONTEND_DEPLOY_ENABLED=true`,
-работает только после успешных CI-проверок на `main` и откажется публиковать текущую API-заглушку. Инструкции для DevOps: [deploy/VPS_SETUP.md](deploy/VPS_SETUP.md).
+Автодеплой на VPS включается repository variable `FRONTEND_DEPLOY_ENABLED=true`
+после настройки production environment и SSH. После успешных CI-проверок на
+`main` workflow публикует стандартную сборку. Пока интеграция с API не готова,
+это локальный демо-интерфейс с mock-данными. При подключении реального API
+разработчик обновит клиентский код, а адрес и деплой останутся прежними.
+Инструкции для DevOps: [deploy/VPS_SETUP.md](deploy/VPS_SETUP.md).
 
 Выкладка на VPS, Nginx и SSH-ключи — зона ответственности backend/DevOps.
 Фронтенд-разработчик поставляет код, тесты и работоспособную сборку через PR.
