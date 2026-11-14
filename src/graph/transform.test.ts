@@ -1,0 +1,7 @@
+import {describe,it,expect} from 'vitest';
+import {mockCoverage} from '../data/mock';
+import {graphEdges,layout} from './transform';
+import {initialStore} from '../analytics/fixtures';
+import {coverageFor} from '../analytics/model';
+describe('graph transform',()=>{it('keeps both Query to User field relations',()=>{const edges=graphEdges(mockCoverage());expect(edges.filter(e=>e.source==='Query'&&e.target==='User').map(e=>e.sourceHandle)).toEqual(['field:Query.user','field:Query.users'])});it('handles wrapped return types through targetType',()=>{expect(graphEdges(mockCoverage()).some(e=>e.source==='User'&&e.target==='Order'&&e.sourceHandle==='field:User.orders')).toBe(true)});it('has expected mock coverage',()=>{expect(mockCoverage('first').summary.coveredFields).toBe(5);expect(mockCoverage('final').summary.coveredFields).toBe(6)})});
+it('builds finite positions for each selected snapshot',()=>{for(const snapshot of initialStore.snapshots){const coverage=coverageFor(snapshot,null,initialStore);const nodes=layout(coverage),edges=graphEdges(coverage);expect(nodes).toHaveLength(snapshot.types.length);expect(new Set(nodes.map(n=>n.id)).size).toBe(nodes.length);expect(nodes.every(n=>Number.isFinite(n.position.x)&&Number.isFinite(n.position.y))).toBe(true);expect(edges.every(e=>nodes.some(n=>n.id===e.source)&&nodes.some(n=>n.id===e.target))).toBe(true)}const billing=initialStore.snapshots.find(s=>s.id==='billing-v1')!;expect(graphEdges(coverageFor(billing,null,initialStore))).toHaveLength(2)});
