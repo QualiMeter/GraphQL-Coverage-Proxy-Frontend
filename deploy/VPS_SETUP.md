@@ -67,17 +67,22 @@ coverage-frontend-deploy. Приватный SSH-ключ не отправля�
 
 ## 3. GitHub Secrets и Variables
 
-В репозитории QualiMeter/GraphQL-Coverage-Proxy-Frontend:
-Settings → Secrets and variables → Actions.
+В репозитории QualiMeter/GraphQL-Coverage-Proxy-Frontend создайте
+Settings → Environments → production. Для него ограничьте deployment branches
+только main. На период первоначальной настройки можно включить required
+reviewers, чтобы DevOps вручную подтверждал первую публикацию.
+
+Секреты и адрес SSH храните **в environment production**, а флаг включения —
+как Repository variable в Settings → Secrets and variables → Actions.
 
 | Тип | Название | Значение |
 | --- | --- | --- |
-| Secret | FRONTEND_DEPLOY_SSH_KEY | Полный **приватный** ключ новой пары |
-| Secret | FRONTEND_DEPLOY_KNOWN_HOSTS | Проверенная строка known_hosts для SSH-хоста |
-| Variable | FRONTEND_DEPLOY_HOST | rebyte.fun |
-| Variable | FRONTEND_DEPLOY_PORT | 22 |
-| Variable | FRONTEND_DEPLOY_USER | coverage-frontend-deploy |
-| Variable | FRONTEND_DEPLOY_ENABLED | **Не создавать** или оставить false до интеграции с API |
+| Environment secret | FRONTEND_DEPLOY_SSH_KEY | Полный **приватный** ключ новой пары |
+| Environment secret | FRONTEND_DEPLOY_KNOWN_HOSTS | Проверенная строка known_hosts для SSH-хоста |
+| Environment variable | FRONTEND_DEPLOY_HOST | rebyte.fun |
+| Environment variable | FRONTEND_DEPLOY_PORT | 22 |
+| Environment variable | FRONTEND_DEPLOY_USER | coverage-frontend-deploy |
+| Repository variable | FRONTEND_DEPLOY_ENABLED | **Не создавать** или оставить false до интеграции с API |
 
 Для pinned known_hosts возьмите открытый SSH host key **с самого VPS**,
 к которому уже есть доверенный доступ:
@@ -97,6 +102,11 @@ production build для PR/main. Job деплоя запускается тол�
 Публикуемый build принудительно использует VITE_DATA_SOURCE=api.
 Пока src/main.tsx содержит заглушку вместо API-интеграции, деплой
 дополнительно отказывается публиковать приложение.
+
+Файл .github/CODEOWNERS назначает DevOps владельцем workflow и deploy файлов.
+Для реального запрета слияния таких изменений без его ревью дополнительно
+настройте ruleset main с обязательным PR и code-owner review. Один CODEOWNERS
+без защиты ветки не гарантирует блокировку merge.
 
 ## 4. Подключение пути в Nginx — только после первого деплоя
 

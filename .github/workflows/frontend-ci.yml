@@ -37,6 +37,10 @@ jobs:
         run: |
           test -s dist/index.html
           grep -q '/coverage/assets/' dist/index.html
+          if find dist -type l -print -quit | grep -q .; then
+            echo '::error::Static release contains a symbolic link.'
+            exit 1
+          fi
       - name: Store static build
         uses: actions/upload-artifact@v4
         with:
