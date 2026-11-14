@@ -1,0 +1,129 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Lint, tests and production build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Build static frontend for the API
+        env:
+          # Production must never publish the mock/localStorage experience.
+          VITE_DATA_SOURCE: api
+        run: npm run build
+      - name: Check built asset paths
+        run: |
+          test -s dist/index.html
+          grep -q '/coverage/assets/' dist/index.html
+          if find dist -type l -print -quit | grep -q .; then
+            echo '::error::Static release contains a symbolic link.'
+            exit 1
+          fi
+      - name: Store static build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Deploy verified static build to VPS
+    needs: verify
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      vars.FRONTEND_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: frontend-production-vps
+      cancel-in-progress: false
+    steps:
+      - name: Checkout to verify API integration
+        uses: actions/checkout@v4
+      - name: Reject an unintegrated API placeholder
+        run: |
+          if grep -Fq 'API-режим ожидает подтверждённого контракта backend' src/main.tsx; then
+            echo '::error::Frontend API integration is not ready; deployment refused.'
+            exit 1
+          fi
+      - name: Download tested static build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+      - name: Configure pinned SSH connection
+        env:
+          SSH_KEY: ${{ secrets.FRONTEND_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.FRONTEND_DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.FRONTEND_DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ vars.FRONTEND_DEPLOY_PORT }}
+          DEPLOY_USER: ${{ vars.FRONTEND_DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          : "${SSH_KEY:?Missing FRONTEND_DEPLOY_SSH_KEY}"
+          : "${KNOWN_HOSTS:?Missing FRONTEND_DEPLOY_KNOWN_HOSTS}"
+          : "${DEPLOY_HOST:?Missing FRONTEND_DEPLOY_HOST}"
+          : "${DEPLOY_PORT:?Missing FRONTEND_DEPLOY_PORT}"
+          : "${DEPLOY_USER:?Missing FRONTEND_DEPLOY_USER}"
+          case "$DEPLOY_PORT" in *[!0-9]*|'') exit 1;; esac
+          case "$DEPLOY_HOST" in *[!a-zA-Z0-9.-]*|'') exit 1;; esac
+          case "$DEPLOY_USER" in *[!a-zA-Z0-9_-]*|'') exit 1;; esac
+          umask 077
+          mkdir -p "$RUNNER_TEMP/frontend-ssh"
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/frontend-ssh/id_ed25519"
+          printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/frontend-ssh/known_hosts"
+          ssh-keygen -y -f "$RUNNER_TEMP/frontend-ssh/id_ed25519" >/dev/null
+          printf '%s\n' \
+            'Host frontend-vps' \
+            "  HostName $DEPLOY_HOST" \
+            "  User $DEPLOY_USER" \
+            "  Port $DEPLOY_PORT" \
+            "  IdentityFile $RUNNER_TEMP/frontend-ssh/id_ed25519" \
+            "  UserKnownHostsFile $RUNNER_TEMP/frontend-ssh/known_hosts" \
+            '  StrictHostKeyChecking yes' \
+            '  IdentitiesOnly yes' \
+            '  BatchMode yes' \
+            > "$RUNNER_TEMP/frontend-ssh/config"
+      - name: Upload a new immutable release
+        run: |
+          set -euo pipefail
+          case "$GITHUB_SHA" in *[!0-9a-f]*|'') exit 1;; esac
+          SSH_CONFIG="$RUNNER_TEMP/frontend-ssh/config"
+          TARGET="/var/www/coverage-frontend/releases/$GITHUB_SHA"
+          ssh -F "$SSH_CONFIG" frontend-vps "mkdir -p '$TARGET'"
+          rsync --archive --compress --delete \
+            -e "ssh -F $SSH_CONFIG" \
+            dist/ "frontend-vps:$TARGET/"
+          ssh -F "$SSH_CONFIG" frontend-vps \
+            "test -s '$TARGET/index.html'"
+      - name: Atomically publish the release
+        run: |
+          set -euo pipefail
+          SSH_CONFIG="$RUNNER_TEMP/frontend-ssh/config"
+          ROOT="/var/www/coverage-frontend"
+          ssh -F "$SSH_CONFIG" frontend-vps \
+            "ln -sfn 'releases/$GITHUB_SHA' '$ROOT/.current-$GITHUB_SHA' && mv -Tf '$ROOT/.current-$GITHUB_SHA' '$ROOT/current'"
