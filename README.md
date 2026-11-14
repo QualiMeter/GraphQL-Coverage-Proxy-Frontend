@@ -31,7 +31,7 @@ npm run dev
 
 - Запланированный адрес фронтенда: **https://graphql.rebyte.fun/coverage/**.
 - API того же origin: **https://graphql.rebyte.fun/api/...** (без `/coverage` в API-путях).
-- Vite использует `base: '/coverage/'`. Для React Router с `BrowserRouter` потребуется `basename="/coverage"`.
+- Vite использует `base: '/coverage/'` для production-сборки и `/` локально. Для React Router с `BrowserRouter` используйте `basename={import.meta.env.BASE_URL}`, чтобы оба режима работали.
 - Для получения данных из frontend используйте относительные запросы вроде `fetch('/api/services')`. Локальный Vite dev-server проксирует `/api` на backend, поэтому отдельная CORS-настройка не требуется.
 - Контракт API: [документация для фронтенда](https://github.com/QualiMeter/GraphQL-Coverage-Proxy-Beckend/blob/main/docs/frontend-api.md), [Swagger](https://graphql.rebyte.fun/docs).
 - **Не** помещайте административный `X-Coverage-Api-Key` в клиентский JavaScript или переменные `VITE_*`.

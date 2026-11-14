@@ -10,6 +10,7 @@
 - Swagger: https://graphql.rebyte.fun/docs
 - Backend продолжает слушать только 127.0.0.1:5081 через Docker.
 - Frontend — статический Vite build, без отдельной БД, Node-процесса или контейнера.
+- Vite base: /coverage/ при сборке, / при локальной разработке (для dev proxy /api).
 - Оба приложения имеют один HTTPS origin; production CORS не нужен.
 
 Nginx на VPS уже обслуживает graphql.rebyte.fun. **Не** добавляйте новый

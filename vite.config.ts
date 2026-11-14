@@ -1,10 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react()],
-  // Keep API routes at /api/... while the frontend is served at /coverage/.
-  base: '/coverage/',
+  // Local dev stays at / so /api proxy works; built assets live at /coverage/.
+  base: command === 'build' ? '/coverage/' : '/',
   server: {
     // Local development stays same-origin from the browser's perspective.
     proxy: {
@@ -14,4 +14,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
