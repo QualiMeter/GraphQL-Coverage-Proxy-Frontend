@@ -28,10 +28,7 @@ jobs:
         run: npm run lint
       - name: Unit tests
         run: npm test
-      - name: Build static frontend for the API
-        env:
-          # Production must never publish the mock/localStorage experience.
-          VITE_DATA_SOURCE: api
+      - name: Build static frontend
         run: npm run build
       - name: Check built asset paths
         run: |
@@ -62,14 +59,6 @@ jobs:
       group: frontend-production-vps
       cancel-in-progress: false
     steps:
-      - name: Checkout to verify API integration
-        uses: actions/checkout@v4
-      - name: Reject an unintegrated API placeholder
-        run: |
-          if grep -Fq 'API-режим ожидает подтверждённого контракта backend' src/main.tsx; then
-            echo '::error::Frontend API integration is not ready; deployment refused.'
-            exit 1
-          fi
       - name: Download tested static build
         uses: actions/download-artifact@v4
         with:

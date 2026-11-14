@@ -82,7 +82,7 @@ reviewers, чтобы DevOps вручную подтверждал первую 
 | Environment variable | FRONTEND_DEPLOY_HOST | rebyte.fun |
 | Environment variable | FRONTEND_DEPLOY_PORT | 22 |
 | Environment variable | FRONTEND_DEPLOY_USER | coverage-frontend-deploy |
-| Repository variable | FRONTEND_DEPLOY_ENABLED | **Не создавать** или оставить false до интеграции с API |
+| Repository variable | FRONTEND_DEPLOY_ENABLED | Установить `true` после настройки SSH/Secrets, чтобы включить публикацию текущего frontend |
 
 Для pinned known_hosts возьмите открытый SSH host key **с самого VPS**,
 к которому уже есть доверенный доступ:
@@ -99,9 +99,10 @@ awk '{print $1, $2}' /etc/ssh/ssh_host_ed25519_key.pub
 Workflow .github/workflows/frontend-ci.yml всегда выполняет линтер, тесты и
 production build для PR/main. Job деплоя запускается только на main после
 успешных проверок **и только если** FRONTEND_DEPLOY_ENABLED=true.
-Публикуемый build принудительно использует VITE_DATA_SOURCE=api.
-Пока src/main.tsx содержит заглушку вместо API-интеграции, деплой
-дополнительно отказывается публиковать приложение.
+Сейчас публикуется стандартная production-сборка с demo/localStorage.
+Никаких секретных API-ключей в bundle нет. После подключения настоящего
+API разработчик обновит клиентский код; тот же workflow будет собирать его без
+дополнительных переключателей и без изменения URL.
 
 Файл .github/CODEOWNERS назначает DevOps владельцем workflow и deploy файлов.
 Для реального запрета слияния таких изменений без его ревью дополнительно
@@ -152,8 +153,9 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://graphql.rebyte.fun/api/service
 
 ## 5. Включение и откат
 
-После ревью настоящей API-интеграции, настройки SSH и первой
-пробной сборки установите Repository variable FRONTEND_DEPLOY_ENABLED=true.
+После настройки SSH и environment production установите Repository variable
+FRONTEND_DEPLOY_ENABLED=true. Первый релиз — демо-версия с локальными данными,
+которую впоследствии заменит реальная API-интеграция.
 Запустите workflow вручную из ветки main (workflow_dispatch), проверьте
 развёртывание; после этого каждый merge в main будет публиковать новую версию.
 
