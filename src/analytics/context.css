@@ -15,19 +15,19 @@
 .create-service-actions button:disabled{opacity:.5;cursor:not-allowed}
 
 /* Верхние блоки: крупнее текст и свободнее вертикальные отступы. */
-.top-global{height:110px;min-height:110px;padding:14px 24px 12px;gap:24px}
-.context-group{height:96px;gap:12px;padding:12px 14px;border-radius:16px;position:relative;top:7px;box-shadow:0 10px 26px #24406b12}
-.context-selector{min-width:195px;max-width:none}
-.context-selector:nth-child(2){min-width:240px}
+.top-global{height:126px;min-height:126px;padding:14px 24px 12px;gap:24px}
+.context-group{height:108px;gap:15px;padding:15px 18px;border-radius:17px;position:relative;top:10px;box-shadow:0 10px 26px #24406b12}
+.context-selector{min-width:215px;max-width:none}
+.context-selector:nth-child(2){min-width:265px}
 .context-selector>span,.header-run>span{font-size:12px;margin:0 0 6px 3px}
 .context-trigger{height:47px;padding:8px 13px}
 .context-trigger strong{font-size:16px}
 .context-menu [role=option] strong{font-size:15px}
-.header-run{min-width:265px;max-width:300px;padding:0 16px}
+.header-run{min-width:290px;max-width:330px;padding:0 18px}
 .header-run strong{font-size:18px}
 .header-run small{font-size:13px;margin:5px 0 0 3px}
 .header-run .run-status{font-size:12px;padding:4px 7px}
-.history-action{height:47px;padding:0 18px;font-size:16px}
+.history-action{height:50px;padding:0 20px;font-size:16px}
 .top-nav{height:50px}
 
 .top-summary{margin-top:18px;grid-template-columns:40fr 60fr}
@@ -45,9 +45,9 @@
 .summary-requests .top-metric:not(.primary-metric) strong{font-size:31px;line-height:1.12}
 
 @media(max-width:1450px){
- .context-selector{min-width:180px}
- .context-selector:nth-child(2){min-width:225px}
- .header-run{min-width:245px;padding:0 13px}
+ .context-selector{min-width:200px}
+ .context-selector:nth-child(2){min-width:245px}
+ .header-run{min-width:265px;padding:0 15px}
  .summary-requests .request-grid{grid-template-columns:minmax(185px,27%) repeat(2,minmax(0,1fr));gap:8px 13px}
 }
 @media(max-width:1220px){
