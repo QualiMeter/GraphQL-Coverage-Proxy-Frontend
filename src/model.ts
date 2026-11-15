@@ -6,6 +6,7 @@ export type Field<Metric extends number | null = number> = {
  hits:Metric;
  deprecated:boolean;
  relationId?:string;
+ relationCovered?:boolean;
  description?:string|null;
  deprecationReason?:string|null;
  args?:{name:string;type:string}[];

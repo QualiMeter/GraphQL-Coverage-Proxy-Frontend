@@ -62,6 +62,7 @@ describe('development proxy configuration', () => {
 describe('HTTP proxy boundary', () => {
   let upstream: Server;
   let vite: ViteDevServer;
+  let fixturePort: number;
   const received = vi.fn();
   const cookies = ['__Host-coverage_session=fixture; Path=/; Secure; HttpOnly; SameSite=Lax', 'other=fixture; Path=/; Secure; HttpOnly; SameSite=Strict'];
 
@@ -80,7 +81,14 @@ describe('HTTP proxy boundary', () => {
     const proxy = Object.values(config.server!.proxy!)[0] as ProxyOptions;
     proxy.target = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`;
     vite = await createServer({configFile: false, envFile: false, ...config, logLevel: 'silent'});
-    await vite.listen();
+    // The runtime guard still sees the production-like Host and Origin below.
+    // Only the test listener uses an ephemeral port so Vite can stay open on 5173.
+    const server = vite.httpServer!;
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    fixturePort = (server.address() as AddressInfo).port;
   });
 
   afterAll(async () => {
@@ -90,7 +98,13 @@ describe('HTTP proxy boundary', () => {
 
   function send(method: string, headers: IncomingHttpHeaders = {}, path = '/api/auth/logout') {
     return new Promise<{status: number; headers: IncomingHttpHeaders; body: string}>((resolve, reject) => {
-      const req = request(`${LOCAL_ORIGIN}${path}`, {method, headers}, res => {
+      const req = request({
+        hostname: '127.0.0.1',
+        port: fixturePort,
+        path,
+        method,
+        headers: {host: new URL(LOCAL_ORIGIN).host, ...headers},
+      }, res => {
         let body = '';
         res.setEncoding('utf8').on('data', chunk => {body += chunk});
         res.on('end', () => resolve({status: res.statusCode!, headers: res.headers, body}));

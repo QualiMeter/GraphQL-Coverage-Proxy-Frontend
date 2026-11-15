@@ -51,6 +51,11 @@ const count = (value: unknown) => typeof value === 'number' && Number.isInteger(
 const percentage = (value: unknown) => value === null || typeof value === 'number' && Number.isFinite(value);
 const rootOperations: readonly RootOperation[] = ['query', 'mutation', 'subscription'];
 
+function isSnapshot(data: unknown, serviceId: string): data is SchemaOut {
+  return object(data) && data.serviceId === serviceId &&
+    strings(data, 'id', 'schemaHash', 'source', 'createdAt') && optionalString(data.displayName);
+}
+
 function field(data: unknown): boolean {
   return object(data) && strings(data, 'name', 'returnType') &&
     (data.targetType === null || typeof data.targetType === 'string') &&
@@ -68,27 +73,58 @@ function graphType(data: unknown): boolean {
 
 export function listSchemas(serviceId: string, signal?: AbortSignal) {
   return requestJson(`/api/schemas?${new URLSearchParams({serviceId})}`, data => {
-    if (!Array.isArray(data) || !data.every(item => object(item) && item.serviceId === serviceId &&
-      strings(item, 'id', 'schemaHash', 'source', 'createdAt') && optionalString(item.displayName))) {
+    if (!Array.isArray(data) || !data.every(item => isSnapshot(item, serviceId))) {
       throw new Error('Expected SchemaOut[] for the selected service');
     }
     return data as SchemaOut[];
   }, {signal});
 }
 
+function importSnapshot(path: '/api/schemas/import' | '/api/schemas/import/introspection',
+  body: {serviceId: string; sdl?: string}, csrfToken: string) {
+  return requestJson(path, data => {
+    if (!isSnapshot(data, body.serviceId)) throw new Error('Expected SchemaOut for the selected service');
+    return data;
+  }, {method: 'POST', body, csrfToken, readErrorCode: true});
+}
+
+export function importSchemaSdl(serviceId: string, sdl: string, csrfToken: string) {
+  return importSnapshot('/api/schemas/import', {serviceId, sdl}, csrfToken);
+}
+
+export function importSchemaIntrospection(serviceId: string, csrfToken: string) {
+  return importSnapshot('/api/schemas/import/introspection', {serviceId}, csrfToken);
+}
+
+export type RunCoverageGraph = CoverageGraph & {
+  runId: string;
+  summary: CoverageSummary & {coveragePercent: number};
+};
+
+function decodeGraph(data: unknown, schemaId: string, runId: string | null): CoverageGraph {
+  if (!object(data) || data.schemaId !== schemaId || data.runId !== runId ||
+    !object(data.summary) || !count(data.summary.totalFields) || !count(data.summary.coveredFields) ||
+    !percentage(data.summary.coveragePercent) ||
+    (data.rootTypes !== undefined && (!object(data.rootTypes) ||
+      !Object.values(data.rootTypes).every(optionalString))) ||
+    !Array.isArray(data.types) || !data.types.every(graphType) ||
+    !Array.isArray(data.relations) || !data.relations.every(relation => object(relation) &&
+      strings(relation, 'id', 'fromType', 'field', 'toType') && typeof relation.covered === 'boolean')) {
+    throw new Error('Expected CoverageGraph for the selected snapshot and run');
+  }
+  return data as CoverageGraph;
+}
+
 export function getSchemaGraph(schemaId: string, signal?: AbortSignal) {
-  return requestJson(`/api/schemas/${encodeURIComponent(schemaId)}/graph`, data => {
-    if (!object(data) || data.schemaId !== schemaId || data.runId !== null ||
-      !object(data.summary) || !count(data.summary.totalFields) || !count(data.summary.coveredFields) ||
-      !percentage(data.summary.coveragePercent) ||
-      (data.rootTypes !== undefined && (!object(data.rootTypes) ||
-        !Object.values(data.rootTypes).every(optionalString))) ||
-      !Array.isArray(data.types) || !data.types.every(graphType) ||
-      !Array.isArray(data.relations) || !data.relations.every(relation => object(relation) &&
-        strings(relation, 'id', 'fromType', 'field', 'toType') && typeof relation.covered === 'boolean')) {
-      throw new Error('Expected CoverageGraph for the selected snapshot');
-    }
-    return data as CoverageGraph;
+  return requestJson(`/api/schemas/${encodeURIComponent(schemaId)}/graph`,
+    data => decodeGraph(data, schemaId, null), {signal});
+}
+
+export function getRunCoverage(runId: string, schemaId: string, signal?: AbortSignal): Promise<RunCoverageGraph> {
+  return requestJson(`/api/runs/${encodeURIComponent(runId)}/coverage`, data => {
+    const graph = decodeGraph(data, schemaId, runId);
+    if (graph.summary.coveragePercent === null) throw new Error('Expected a run coverage percentage');
+    return graph as RunCoverageGraph;
   }, {signal});
 }
 
