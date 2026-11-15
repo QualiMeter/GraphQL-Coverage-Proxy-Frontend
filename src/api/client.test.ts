@@ -44,6 +44,15 @@ describe('coverage API client', () => {
     await expect(listServices()).rejects.toMatchObject({name: 'ApiError', kind: 'http', status});
   });
 
+  it.each([403, 503, 'network'])('never retries an unsafe request after %s', async failure => {
+    const fetch = failure === 'network'
+      ? vi.fn().mockRejectedValue(new TypeError('offline'))
+      : vi.fn().mockResolvedValue(new Response(null, {status: failure as number}));
+    vi.stubGlobal('fetch', fetch);
+    await expect(requestJson('/api/auth/logout', data => data, {method: 'POST', csrfToken: 'test-csrf'})).rejects.toBeDefined();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('reports a network failure and propagates cancellation', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Network failure')));
     await expect(listServices()).rejects.toMatchObject({kind: 'network'});

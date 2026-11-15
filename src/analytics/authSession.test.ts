@@ -28,8 +28,8 @@ describe('auth session', () => {
     expect(auth.snapshot()).toMatchObject({session: null, revision: 2});
   });
 
-  it('uses the login contract, notifies subscribers, and starts a new catalog revision', async () => {
-    const session = active();
+  it.each(['operator', 'admin'] as const)('supports %s login and restores its session after a page reload', async role => {
+    const session = {...active(), user: {...account, role}};
     const fetch = vi.fn().mockResolvedValueOnce(anonymous()).mockResolvedValueOnce(Response.json(session));
     vi.stubGlobal('fetch', fetch);
     const auth = createAuthSession();
@@ -45,6 +45,11 @@ describe('auth session', () => {
     }));
     expect(states.some(state => state.pending === 'login')).toBe(true);
     expect(auth.snapshot()).toMatchObject({session, revision: 1, pending: null});
+
+    fetch.mockResolvedValueOnce(Response.json(session));
+    const afterReload = createAuthSession();
+    await afterReload.restore();
+    expect(afterReload.snapshot()).toMatchObject({session, checked: true});
   });
 
   it.each([
