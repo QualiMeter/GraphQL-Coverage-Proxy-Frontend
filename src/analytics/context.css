@@ -14,67 +14,45 @@
 .create-service-actions button.primary{background:#4361ee;border-color:#4361ee;color:#fff}
 .create-service-actions button:disabled{opacity:.5;cursor:not-allowed}
 
-/* Верхние блоки: крупнее текст и свободнее вертикальные отступы. */
-.top-global{height:126px;min-height:126px;padding:14px 24px 12px;gap:24px}
-.context-group{height:108px;gap:15px;padding:15px 18px;border-radius:17px;position:relative;top:10px;box-shadow:0 10px 26px #24406b12}
-.context-selector{min-width:215px;max-width:none}
-.context-selector:nth-child(2){min-width:265px}
-.context-selector>span,.header-run>span{font-size:12px;margin:0 0 6px 3px}
-.context-trigger{height:47px;padding:8px 13px}
-.context-trigger strong{font-size:16px}
+/* Верхняя панель и сводка. */
+.top-global{height:auto;min-height:0;padding:5px 24px;gap:8px 20px;border-bottom:0;flex-wrap:nowrap;align-items:center}
+.context-group{
+ display:grid;
+ align-self:center;
+ order:0;
+ grid-template-columns:minmax(145px, 1fr) minmax(185px, 1.2fr) minmax(225px, auto) auto;
+ gap:9px;
+ width:min(100%, 800px);
+ margin:0 0 0 auto;
+ padding:5px;
+ border-radius:13px;
+}
+.context-group .context-selector{min-width:0;max-width:none}
+.context-trigger{height:46px;gap:6px;padding:4px 10px;text-align:left}
+.context-trigger .context-trigger-copy{display:grid;gap:1px;min-width:0;font-size:12px;line-height:1.2;color:#667891}
+.context-trigger strong{font-size:15px;color:var(--ink)}
 .context-menu [role=option] strong{font-size:15px}
-.header-run{min-width:290px;max-width:330px;padding:0 18px}
-.header-run strong{font-size:18px}
-.header-run small{font-size:13px;margin:5px 0 0 3px}
-.header-run .run-status{font-size:12px;padding:4px 7px}
-.history-action{height:50px;padding:0 20px;font-size:16px}
-.top-nav{height:50px}
+.context-group .header-run{min-width:0;max-width:none;padding:0 9px}
+.header-run>span{font-size:11px;line-height:1.2;margin:0}
+.header-run strong{font-size:15px;line-height:1.2}
+.header-run small{font-size:12px;line-height:1.2;margin:2px 0 0}
+.header-run .run-status{font-size:11px;line-height:1.2;padding:2px 5px}
+.history-action{height:38px;padding:0 14px;font-size:15px}
 
-.top-summary{margin-top:18px;grid-template-columns:40fr 60fr}
-.summary-area{min-height:222px;padding:21px 24px}
-.summary-area h2{font-size:19px;margin-bottom:14px;color:#34435d}
-.summary-coverage>.primary-metric strong{font-size:39px}
-.coverage-counts .top-metric strong,.coverage-counts .static-metric strong{font-size:25px}
-.coverage-counts .top-metric span,.coverage-counts .static-metric span{font-size:14px}
-.coverage-track{margin:10px 8px 12px}
-.summary-requests .request-grid{grid-template-columns:minmax(210px,27%) repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(67px,1fr));gap:10px 20px}
-.summary-requests .request-grid .primary-metric{padding:9px 26px 9px 8px;border-right:1px solid #dce5f3}
-.summary-requests .request-grid .primary-metric strong{font-size:50px;line-height:1.05}
-.summary-requests .top-metric:not(.primary-metric){padding:8px 12px}
-.summary-requests .top-metric span{font-size:15px}
-.summary-requests .top-metric:not(.primary-metric) strong{font-size:31px;line-height:1.12}
-
-@media(max-width:1450px){
- .context-selector{min-width:200px}
- .context-selector:nth-child(2){min-width:245px}
- .header-run{min-width:265px;padding:0 15px}
- .summary-requests .request-grid{grid-template-columns:minmax(185px,27%) repeat(2,minmax(0,1fr));gap:8px 13px}
-}
-@media(max-width:1220px){
- .top-global{height:auto;min-height:110px;flex-wrap:wrap;padding-bottom:14px}
- .context-group{order:2;width:100%;margin:0;justify-content:space-between;top:0}
- .context-selector{flex:1}
- .header-run{flex:1;max-width:none}
-}
-@media(max-width:800px){
- .top-summary{grid-template-columns:1fr}
- .summary-requests .request-grid{grid-template-columns:minmax(155px,27%) repeat(2,minmax(0,1fr))}
+@media(max-width:960px){
+ .top-global{flex-wrap:wrap}
+ .top-global .context-group{order:2;margin-left:auto}
 }
 @media(max-width:700px){
- .top-global{padding:12px}
- .context-group{height:auto;flex-wrap:wrap}
- .context-selector,.context-selector:nth-child(2){min-width:calc(50% - 8px)}
- .header-run{min-width:0}
- .summary-requests .request-grid{grid-template-columns:120px repeat(2,minmax(0,1fr));gap:6px}
- .summary-requests .request-grid .primary-metric strong{font-size:42px}
- .summary-requests .top-metric:not(.primary-metric) strong{font-size:25px}
- .summary-requests .top-metric span{font-size:13px}
+ .top-global{padding-inline:12px}
+ .context-group{grid-template-columns:minmax(0, 1fr) minmax(0, 1fr)}
+ .context-group .header-run{padding-left:7px}
+ .history-action{justify-self:end}
 }
 
 /* Навигация и управление представлением схемы. */
-.top-global{border-bottom:0}
-.top-nav{height:64px;gap:10px;align-items:center;padding:8px 24px;border-bottom:0;background:#fff}
-.top-nav button{height:46px;padding:0 20px;border:1px solid #e0e8f5;border-radius:12px;background:#f5f8fe;color:#526680;font-size:16px;font-weight:650;box-shadow:0 2px 7px #23416a08}
+.top-nav{height:52px;gap:10px;align-items:center;padding:6px 24px;border-bottom:0;background:#fff}
+.top-nav button{height:40px;padding:0 20px;border:1px solid #e0e8f5;border-radius:12px;background:#f5f8fe;color:#526680;font-size:16px;font-weight:650;box-shadow:0 2px 7px #23416a08}
 .top-nav button.active{border:1px solid #c5d4fb;background:#eaf0ff;color:#3458d2;box-shadow:0 3px 11px #3458d21a}
 .top-nav button:hover{border-color:#c4d3f4;background:#edf3ff;color:#3458d2}
 .top-nav button:focus-visible{outline:2px solid #4361ee;outline-offset:2px}
