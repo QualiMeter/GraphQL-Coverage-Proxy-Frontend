@@ -16,7 +16,7 @@ export function addLocalService(store:Store,input:{name:string;endpointUrl:strin
  return {...store,services:[...store.services,service]};
 }
 export type IntrospectionResult={status:'unavailable';message:string}|{status:'success';sdl:string}|{status:'error';message:string};
-export async function schemaByIntrospection(service:Service):Promise<IntrospectionResult>{
+export async function schemaByIntrospection(service:Pick<Service,'endpointUrl'>):Promise<IntrospectionResult>{
  if(!service.endpointUrl)return {status:'unavailable',message:'У сервиса не указан GraphQL endpoint URL.'};
  return {status:'unavailable',message:'Получение схемы через introspection будет доступно после подключения backend.'};
 }

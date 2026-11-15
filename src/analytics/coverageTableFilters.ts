@@ -1,5 +1,5 @@
 import {Kind, parse, parseType, specifiedScalarTypes} from 'graphql';
-import {fieldId, type SchemaType} from '../model';
+import {fieldId, type GraphType} from '../model';
 
 export type CoverageFilter = 'all' | 'covered' | 'uncovered';
 export type CoverageSort = 'date' | 'type-field' | 'hits-asc' | 'hits';
@@ -27,7 +27,7 @@ function returnKind(signature: string, kinds: ReadonlyMap<string, string>) {
   }
 }
 
-export function coverageRows(types: readonly SchemaType[], sdl?: string) {
+export function coverageRows(types: readonly GraphType[], sdl?: string) {
   const kinds = new Map<string, string>(specifiedScalarTypes.map(type => [type.name, 'SCALAR']));
   for (const type of types) kinds.set(type.name, type.kind);
   if (sdl) {
@@ -59,7 +59,7 @@ export function filterCoverageRows(rows: ReturnType<typeof coverageRows>, filter
     (!filters.type || type === filters.type) &&
     (filters.coverage === 'all' || field.covered === (filters.coverage === 'covered')) &&
     (!filters.search || `${type} ${field.name} ${id} ${field.returnType}`.toLowerCase().includes(filters.search)) &&
-    (filters.hits === 'all' || field.hits >= minHits && field.hits <= maxHits) &&
+    (filters.hits === 'all' || field.hits !== null && field.hits >= minHits && field.hits <= maxHits) &&
     (filters.returns === 'all' || returns === filters.returns) &&
     (filters.deprecated === 'all' || field.deprecated === (filters.deprecated === 'yes'))
   )).sort((a, b) => {
@@ -68,7 +68,7 @@ export function filterCoverageRows(rows: ReturnType<typeof coverageRows>, filter
     if (order === 'type-field') return byType || byField;
     const byName = byField || byType;
     if (order === 'date') return byName;
-    const byHits = a.field.hits - b.field.hits;
+    const byHits = (a.field.hits ?? -1) - (b.field.hits ?? -1);
     return (order === 'hits-asc' ? byHits : -byHits) || byName;
   });
 }
