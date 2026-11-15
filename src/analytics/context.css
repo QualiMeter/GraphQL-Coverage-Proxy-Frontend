@@ -14,7 +14,6 @@
 .create-service-actions button.primary{background:#4361ee;border-color:#4361ee;color:#fff}
 .create-service-actions button:disabled{opacity:.5;cursor:not-allowed}
 
-/* Верхняя панель и сводка. */
 .top-global{height:auto;min-height:0;padding:5px 24px;gap:8px 20px;border-bottom:0;flex-wrap:nowrap;align-items:center}
 .context-group{
  display:grid;
@@ -50,7 +49,6 @@
  .history-action{justify-self:end}
 }
 
-/* Навигация и управление представлением схемы. */
 .top-nav{height:52px;gap:10px;align-items:center;padding:6px 24px;border-bottom:0;background:#fff}
 .top-nav button{height:40px;padding:0 20px;border:1px solid #e0e8f5;border-radius:12px;background:#f5f8fe;color:#526680;font-size:16px;font-weight:650;box-shadow:0 2px 7px #23416a08}
 .top-nav button.active{border:1px solid #c5d4fb;background:#eaf0ff;color:#3458d2;box-shadow:0 3px 11px #3458d21a}
