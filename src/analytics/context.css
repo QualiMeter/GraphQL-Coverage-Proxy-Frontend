@@ -68,3 +68,31 @@
 .schema-panel-tools .segmented button.active{background:#fff;color:#3458d2;box-shadow:0 2px 7px #23416a18}
 .schema-panel-tools .segmented button:focus-visible,.schema-panel-tools .schema-view-actions>button:focus-visible{outline:2px solid #4361ee;outline-offset:2px}
 @media(max-width:700px){.top-nav{padding:7px 12px;gap:7px}.top-nav button{padding:0 14px;font-size:14px}.schema-panel-tools{padding:8px 10px}.schema-panel-tools>span{display:none}.schema-view-actions{width:100%;justify-content:flex-end}}
+
+.schema-panel-tools:has(.refresh-run-coverage) {
+  flex-wrap: wrap;
+}
+
+.schema-panel-tools .schema-view-actions:has(.refresh-run-coverage) {
+  flex: 0 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.panel-tools.run-coverage-notice {
+  min-height: 0;
+  padding-block: 7px;
+  color: #526680;
+  font-size: 13px;
+}
+
+.run-coverage-notice[role="alert"] {
+  background: #fff7f5;
+  color: #953c3c;
+}
+
+.schema-panel-tools .refresh-run-coverage:disabled {
+  opacity: .6;
+  cursor: default;
+}

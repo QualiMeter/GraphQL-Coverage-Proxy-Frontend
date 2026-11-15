@@ -1,5 +1,5 @@
 import type {CoverageGraph, RootOperation, SchemaOut} from '../api/schemas';
-import {fieldId, type SchemaType} from '../model';
+import {fieldId, type GraphType} from '../model';
 
 export type SnapshotOption = {id: string; name: string; source: string; createdAt: string};
 
@@ -14,7 +14,8 @@ export function snapshotOption(snapshot: SchemaOut): SnapshotOption {
 
 const rootOperations: readonly RootOperation[] = ['query', 'mutation', 'subscription'];
 
-export function schemaGraphTypes(graph: CoverageGraph): SchemaType<null>[] {
+export function schemaGraphTypes(graph: CoverageGraph): GraphType[] {
+  const measured = graph.runId !== null;
   const names = new Set(graph.types.map(type => type.name));
   const relations = new Map(graph.relations
     .filter(relation => names.has(relation.toType))
@@ -29,8 +30,8 @@ export function schemaGraphTypes(graph: CoverageGraph): SchemaType<null>[] {
       role: operations[0],
       rootOperations: operations,
       totalFields: type.totalFields,
-      coveredFields: null,
-      coveragePercent: null,
+      coveredFields: measured ? type.coveredFields : null,
+      coveragePercent: measured ? type.coveragePercent : null,
       fields: type.fields.map(field => {
         const relation = relations.get(fieldId(type.name, field.name));
         return {
@@ -38,12 +39,13 @@ export function schemaGraphTypes(graph: CoverageGraph): SchemaType<null>[] {
           returnType: field.returnType,
           targetType: relation?.toType ?? null,
           relationId: relation?.id,
+          relationCovered: measured ? relation?.covered : undefined,
           deprecated: field.deprecated,
           description: field.description,
           deprecationReason: field.deprecationReason,
           args: field.args,
-          covered: null,
-          hits: null,
+          covered: measured ? field.covered : null,
+          hits: measured ? field.hits : null,
         };
       }),
     };

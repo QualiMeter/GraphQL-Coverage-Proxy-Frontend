@@ -16,7 +16,7 @@ export function workspaceActionFor(action: WorkspaceAction, session: Session | n
   if (!canCreateService(session)) return 'denied';
   if (action === 'service') return 'create-service';
   if (action === 'snapshot') return 'remote-snapshot';
-  return 'run-unavailable';
+  return 'create-run';
 }
 
 export type WorkspaceIntent = {

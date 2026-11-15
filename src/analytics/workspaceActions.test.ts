@@ -20,9 +20,9 @@ describe('workspace action routing', () => {
     expect(actions.map(action => workspaceActionFor(action, session(role), false))).toEqual(['denied', 'denied', 'denied']);
   });
 
-  it.each(['operator', 'admin'] as const)('opens the real service form and honest integration states for %s', role => {
+  it.each(['operator', 'admin'] as const)('offers backend actions for %s', role => {
     expect(actions.map(action => workspaceActionFor(action, session(role), false))).toEqual([
-      'create-service', 'remote-snapshot', 'run-unavailable',
+      'create-service', 'remote-snapshot', 'create-run',
     ]);
   });
 

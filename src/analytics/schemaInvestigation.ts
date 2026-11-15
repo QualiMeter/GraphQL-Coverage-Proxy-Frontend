@@ -2,7 +2,7 @@ import {Kind,parse,print} from 'graphql';
 import {relationId, type GraphType} from '../model';
 import type {Snapshot} from './model';
 
-export type Relation={id:string;source:string;field:string;target:string};
+export type Relation={id:string;source:string;field:string;target:string;covered?:boolean};
 export type NestedRelation={first:Relation;second:Relation};
 export type SchemaSelection={kind:'type'|'field';id:string};
 export type Viewport={x:number;y:number;zoom:number};
@@ -25,7 +25,7 @@ export function moveStep(history:InvestigationHistory,direction:-1|1):Investigat
 }
 export function relationsFor(types:GraphType[]):Relation[]{
  const names=new Set(types.map(type=>type.name));
- return types.flatMap(type=>type.fields.filter(field=>field.targetType&&names.has(field.targetType)).map(field=>({id:field.relationId??relationId(type.name,field.name,field.targetType!),source:type.name,field:field.name,target:field.targetType!})));
+ return types.flatMap(type=>type.fields.filter(field=>field.targetType&&names.has(field.targetType)).map(field=>({id:field.relationId??relationId(type.name,field.name,field.targetType!),source:type.name,field:field.name,target:field.targetType!,...(field.relationCovered===undefined?{}:{covered:field.relationCovered})})));
 }
 export function nestedRelations(typeName:string,relations:Relation[]):NestedRelation[]{
  const result:NestedRelation[]=[];
