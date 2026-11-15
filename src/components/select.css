@@ -1,0 +1,108 @@
+.ui-select {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ui-select-label {
+  color: #52617a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+button.ui-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 10px;
+  border: 1px solid var(--line, #dfe7f2);
+  border-radius: 9px;
+  background: #f9fbfe;
+  color: #34465e;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+button.ui-select-trigger > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.ui-select-trigger[data-modified="true"],
+button.ui-select-trigger:hover,
+button.ui-select-trigger[aria-expanded="true"] {
+  border-color: #9fb7ee;
+  background: #eef3ff;
+}
+
+button.ui-select-trigger:focus-visible {
+  outline: 2px solid var(--primary, #4361ee);
+  outline-offset: 2px;
+}
+
+.ui-select-chevron {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin: -4px 2px 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+[aria-expanded="true"] > .ui-select-chevron {
+  margin-top: 3px;
+  transform: rotate(225deg);
+}
+
+.ui-select-menu {
+  position: fixed;
+  z-index: 1000;
+  box-sizing: border-box;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+  border: 1px solid #dfe7f2;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 10px 26px #19335926;
+  color: #263750;
+  font-size: 13px;
+  line-height: 1.4;
+  animation: ui-select-appear 120ms ease-out;
+}
+
+.ui-select-menu [role="option"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.ui-select-menu [aria-selected="true"] {
+  color: #294cb8;
+  font-weight: 700;
+}
+
+.ui-select-menu [data-highlighted="true"] {
+  background: #edf2ff;
+}
+
+@keyframes ui-select-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-select-menu { animation: none; }
+}
