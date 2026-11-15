@@ -1,0 +1,23 @@
+.context-menu .context-options small{max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.create-service-dialog form label{display:grid;gap:6px;margin-top:14px;font-size:13px;font-weight:700;color:#40536f}
+.create-service-dialog form label span{display:inline;color:#8290a4;font-weight:400}
+.create-service-dialog textarea{width:100%;resize:vertical;min-height:70px;border:1px solid #cfd9eb;border-radius:10px;padding:10px 12px;font:inherit;color:#17243b}
+.create-service-dialog textarea:focus{outline:2px solid #9bb3ff;outline-offset:2px}
+.create-service-dialog .form-error{color:#aa3744;background:#fff3f3;border-radius:8px;padding:9px 11px;margin:12px 0 0;font-size:12px}
+.snapshot-dialog-content{padding:24px}.snapshot-dialog-content h2{margin:0 0 8px}.snapshot-dialog-content>p{font-size:13px;color:#64758c;margin:0 0 16px}
+.snapshot-methods{display:flex;gap:8px;border-bottom:1px solid #e4ebf5;padding-bottom:10px}.snapshot-methods button{border:1px solid #dce5f3;border-radius:9px;background:#f8faff;color:#526985;font-size:13px;font-weight:700;padding:9px 13px}.snapshot-methods button.active{background:#eaf1ff;color:#315bd1;border-color:#bdcdf2}
+.snapshot-method-body{min-height:130px;padding:15px 0}.snapshot-method-body p{font-size:13px;color:#63758c;line-height:1.5;margin:0 0 14px}.snapshot-method-body code{color:#264e9a;overflow-wrap:anywhere}.snapshot-file{display:inline-block;position:relative;background:#4361ee;color:#fff;border-radius:9px;padding:10px 15px;font-size:13px;font-weight:700;cursor:pointer}.snapshot-file input{position:absolute;width:1px;height:1px;opacity:0}.snapshot-file:focus-within{outline:2px solid #315bd1;outline-offset:2px}.introspection-notice{background:#f3f6fb;border:1px solid #e1e8f2;border-radius:9px;padding:11px;color:#51627d!important}
+.top-summary .summary-area{padding:16px 20px;min-height:220px}.top-summary .summary-coverage{display:flex;flex-direction:column}.top-summary .summary-coverage h2,.top-summary .summary-requests h2{margin-bottom:8px}
+.summary-coverage .coverage-main{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly}.summary-coverage .coverage-main>.primary-metric{padding:0 7px}.summary-coverage .coverage-main>.primary-metric strong{font-size:37px;line-height:1.05;color:#4361ee}
+.summary-coverage .coverage-counts .top-metric strong,.summary-coverage .coverage-counts .static-metric strong{font-size:22px}.top-summary .summary-coverage .coverage-track{margin:5px 8px 7px}
+.metric-info{font-style:normal;font-size:14px;color:#8298c6;margin-left:5px;vertical-align:middle}.top-summary .top-metric:hover .metric-info{color:#4361ee}
+.top-summary .summary-requests .request-grid{grid-template-columns:minmax(180px,27%) repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(62px,1fr));gap:8px 12px}
+.top-summary .top-summary .summary-requests .request-grid .primary-metric{grid-row:span 2;padding-right:20px}.top-summary .top-summary .summary-requests .request-grid .primary-metric strong{font-size:43px}
+.top-summary .summary-requests .top-metric:not(.primary-metric){padding:7px 8px}.top-summary .summary-requests .top-metric:not(.primary-metric) strong{font-size:24px}.top-summary .summary-requests .top-metric span{font-size:13px;white-space:normal;line-height:1.2}
+.top-metric:disabled{cursor:default}.top-metric:disabled:hover{background:transparent}
+.flow-space{position:relative}.schema-empty-hint{position:absolute;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%);max-width:300px;text-align:center;color:#6c7e99;font-size:14px;line-height:1.5;pointer-events:none}
+@media(max-width:1500px){.top-summary .summary-requests .request-grid{grid-template-columns:minmax(155px,26%) repeat(3,minmax(0,1fr));gap:7px}.top-summary .summary-requests .top-metric:not(.primary-metric) strong{font-size:22px}.top-summary .summary-requests .top-metric span{font-size:12px}}
+@media(max-width:1000px){.top-summary{grid-template-columns:1fr;}.summary-requests{border-left:1px solid var(--line)!important}.top-summary .summary-requests .request-grid{grid-template-columns:minmax(150px,26%) repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.top-summary .summary-requests .request-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto}.top-summary .summary-requests .request-grid .primary-metric{grid-row:auto;grid-column:span 2;border-right:0;border-bottom:1px solid #e8edf5;padding:5px 8px}}
+
+
