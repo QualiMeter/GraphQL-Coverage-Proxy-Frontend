@@ -49,3 +49,24 @@ API доступны анонимно. Приватные сервисы тре�
 чтобы Origin совпал с настройкой backend. Прокси Vite к production подходит для
 анонимного чтения. Для проверки входа через Vite используйте локальный backend и
 его настройки Origin, указанные выше.
+
+
+## Production и CI/CD
+
+Frontend развёртывается по адресу:
+https://graphql.rebyte.fun/coverage/
+
+Backend API:
+https://graphql.rebyte.fun/api/
+
+Для production-сборки Vite использует базовый путь `/coverage/`.
+
+Frontend и Backend API работают на одном origin.
+Это необходимо для корректной работы авторизации,
+cookie и CSRF-защиты.
+
+После слияния изменений в ветку `main` GitHub Actions
+автоматически запускает развёртывание frontend на сервере.
+
+При локальной разработке запросы `/api` перенаправляются
+на backend через Vite proxy.

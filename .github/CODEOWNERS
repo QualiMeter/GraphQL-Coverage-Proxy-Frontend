@@ -1,0 +1,3 @@
+# Workflow and VPS deployment changes require DevOps review.
+/.github/workflows/ @Mouse-ai
+/deploy/ @Mouse-ai
