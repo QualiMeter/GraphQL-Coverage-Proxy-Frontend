@@ -18,6 +18,10 @@ import {snapshotFromSDL} from './sdl';
 import {isMockService, MOCK_SERVICE_ID} from './mockService';
 import {useServiceCatalog} from './serviceCatalog';
 import {useAuth} from './useAuth';
+import {ApiError} from '../api/client';
+import {createService, type ServiceCreate} from '../api/services';
+import {canCreateService} from './serviceCreation';
+import {workspaceActionFor, type WorkspaceAction, type WorkspaceIntent} from './workspaceActions';
 import {schemaGraphTypes, snapshotOption} from './backendSchema';
 import {useBackendSchema, useBackendSdl} from './useBackendSchema';
 import {summaryDestination} from './navigation';
@@ -35,6 +39,8 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
  useEffect(()=>saveStore(store),[store]);
  const auth=useAuth();
  const {restore,session}=auth;
+ const [actionRequest,setActionRequest]=useState<(WorkspaceIntent&{revision:number;serviceId:string})|null>(null);
+ const intent=actionRequest?.serviceId===serviceId&&actionRequest.revision===auth.revision?actionRequest:null;
  const catalog=useServiceCatalog(store.services,auth.checked?auth.revision:null);
  useEffect(()=>{
   if(session&&catalog.state.kind==='error'&&catalog.state.error.status===401)void restore();
@@ -79,7 +85,7 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
 
  const snapshotStatus=remoteList.kind==='error'?'Ошибка загрузки':remoteList.kind==='ready'?'Снимков нет':'Загрузка…';
  const remoteMessage=schemaError?.message??(remoteList.kind==='ready'&&remote.items.length===0
-  ?'У этого сервиса пока нет снимков схемы.'
+  ?'У этого сервиса пока нет снимков схемы. Откройте селектор «Снимок схемы», чтобы посмотреть способы импорта.'
   :remoteGraph.kind==='loading'?'Загружаем граф схемы…':'Загружаем снимки схемы…');
  const resetSchemaNavigation=useCallback(()=>{
   setSchemaHistory(emptyHistory);
@@ -100,10 +106,8 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
   lastAuthRevision.current=auth.revision;
   if(!mockSelected){resetSchemaNavigation();resetSchemaFilters()}
  },[auth.revision,mockSelected,resetSchemaNavigation,resetSchemaFilters]);
- const chooseService=(id:string)=>{
-  const service=catalog.services.find(item=>item.id===id);
-  if(!service||id===serviceId)return;
-  const local=service.source==='mock';
+ const selectService=(id:string,local:boolean)=>{
+  if(id===serviceId)return;
   const firstRun=local?store.runs.find(item=>item.serviceId===id):undefined;
   const firstSnapshot=local?store.snapshots.find(item=>item.serviceId===id):undefined;
   setServiceId(id);
@@ -114,6 +118,27 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
   resetSchemaNavigation();
   resetSchemaFilters();
   setMessage('');
+ };
+ const chooseService=(id:string)=>{
+  const service=catalog.services.find(item=>item.id===id);
+  if(service)selectService(id,service.source==='mock');
+ };
+ const submitService=async(input:ServiceCreate)=>{
+  const current=auth.getCurrent();
+  if(current.pending||current.revision!==auth.revision||!canCreateService(current.session)){
+   throw new ApiError('http','Сессия недоступна.',401);
+  }
+  try{
+   const created=await createService(input,current.session.csrfToken);
+   const latest=auth.getCurrent();
+   if(latest.revision!==current.revision||latest.pending||!canCreateService(latest.session))return;
+   catalog.refreshAfterCreate(created);
+   selectService(created.id,false);
+   setMessage('Сервис добавлен');
+  }catch(error){
+   if(error instanceof ApiError&&(error.status===401||error.status===403))void restore();
+   throw error;
+  }
  };
  const hadSession=useRef(Boolean(session));
  useEffect(()=>{
@@ -150,6 +175,13 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
  const summaryAction=(key:string)=>{if(key==='zero-types'){setPage('schema');setMode('graph');setExplorerRequest(value=>value+1);setDetail(null);return}if(key==='operations'){goOperations('');return}const target=summaryDestination(key);setDetail(null);setQuery('');if(target.page==='schema'){setPage('schema');setMode(target.mode as 'graph'|'table');setFieldFilter(target.filter as CoverageFilter)}else{goRequests(target.filter as RequestFilter);if('sort'in target&&target.sort)setSort(target.sort)}};
  const importSDL=async(file:File):Promise<{ok:boolean;message:string}>=>{if(!mockSelected)return {ok:false,message:'Импорт для сервисов API пока недоступен'};try{if(!/\.(graphql|gql)$/i.test(file.name))throw new Error('Нужен файл .graphql или .gql');const text=await file.text();const s=snapshotFromSDL(text,serviceId,file.name,crypto.randomUUID());setStore(old=>({...old,snapshots:[...old.snapshots,s]}));setSnapshotId(s.id);setRunId('');resetSchemaNavigation();setPage('schema');setMessage('Схема импортирована локально');return {ok:true,message:'Схема импортирована локально'}}catch(error){const message=error instanceof Error?`Ошибка SDL: ${error.message}`:'Ошибка SDL';setMessage(message);return {ok:false,message}}};
  const createRun=()=>{if(!snapshot)return;const name=prompt('Название локального прогона');if(!name?.trim())return;const next:Run={id:crypto.randomUUID(),name:name.trim(),serviceId,snapshotId:snapshot.id,status:'active',startedAt:new Date().toISOString(),endedAt:null};setStore(s=>({...s,runs:[...s.runs,next]}));chooseRun(next.id);setRunId(next.id);setMessage('Локальный прогон создан')};
+ const requestAction=(action:WorkspaceAction)=>{
+  const current=auth.getCurrent();
+  const outcome=workspaceActionFor(action,current.session,mockSelected);
+  if(outcome==='local-run'){createRun();return}
+  setActionRequest({action,outcome,revision:current.revision,serviceId});
+ };
+ const closeAction=()=>setActionRequest(current=>current===actionRequest?null:current);
  const finishRun=()=>{if(!run||run.status!=='active')return;setStore(s=>({...s,runs:s.runs.map(r=>r.id===run.id?{...r,status:'completed',endedAt:new Date().toISOString()}:r)}));setMessage('Локальный прогон завершён')};
  const nodesReady=useNodesInitialized();const fittedSnapshot=useRef('');const [hoveredField,setHoveredField]=useState<string|null>(null);
  const [nodePositions,setNodePositions]=useState<Record<string,{x:number;y:number}>>({});
@@ -208,10 +240,13 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
  const visibleRequests=requests.filter(r=>{const op=store.operations.find(o=>o.id===r.operationId);return (op?.name.toLowerCase().includes(query.toLowerCase())??false)&&(requestFilter==='all'||requestFilter==='http'&&r.httpStatus>=400||requestFilter==='graphql'&&r.graphqlErrors.length>0||requestFilter==='analyzer'&&!!r.analyzerError)&&(!requestField||r.hasData&&!r.analyzerError&&op?.fields.some(f=>fieldId(f.type,f.field)===requestField))&&(!requestOperation||r.operationId===requestOperation)&&(operationKind==='all'||op?.kind===operationKind)}).sort((a,b)=>sort==='duration'?b.durationMs-a.durationMs:b.at.localeCompare(a.at));
  const history=mockRuns.filter(r=>r.name.toLowerCase().includes(query.toLowerCase())&&(operationKind==='all'||r.status===operationKind)).sort((a,b)=>sort==='coverage'?(coverageFor(store.snapshots.find(s=>s.id===b.snapshotId)!,b,store).summary.coveragePercent-coverageFor(store.snapshots.find(s=>s.id===a.snapshotId)!,a,store).summary.coveragePercent):b.startedAt.localeCompare(a.startedAt));
  const selectedOp=detail?.kind==='operation'?store.operations.find(o=>o.id===detail.id):null;const selectedRequest=detail?.kind==='request'?store.observations.find(o=>o.id===detail.id):null;
- return <div className="analytics-app"><TopChrome auth={auth} catalog={catalog} mockSelected={mockSelected} serviceId={serviceId} snapshots={snapshots} snapshot={selectedSnapshot} snapshotStatus={snapshotStatus} run={run} metrics={metrics} coverage={coverage?.summary??null} schemaFieldCount={schemaId&&(mockSelected||remoteGraphData)?graphTypes.reduce((sum,type)=>sum+type.totalFields,0):null} page={page} onService={chooseService} onSnapshot={chooseSnapshot} onImport={importSDL} onPage={next=>{setPage(next);setQuery('');setDetail(null);setOperationKind('all');setSort('date')}} onMetric={summaryAction}/>{message&&<div className="toast" role="status">{message}<button onClick={()=>setMessage('')}>×</button></div>}<main className={`analytics-main page-${page}`}><div className="view-heading"><div><h1>{tabs.find(t=>t.id===page)?.label}</h1></div></div><div className="view-body">{!mockSelected&&(page!=='schema'||!remoteGraphData)?<div className="content-panel">
-  {page!=='schema'?<Empty text="Данные прогонов для сервисов API пока недоступны."/>:
+ return <div className="analytics-app"><TopChrome intent={intent} onAction={requestAction} onCloseAction={closeAction} auth={auth} catalog={catalog} mockSelected={mockSelected} serviceId={serviceId} snapshots={snapshots} snapshot={selectedSnapshot} snapshotStatus={snapshotStatus} run={run} metrics={metrics} coverage={coverage?.summary??null} schemaFieldCount={schemaId&&(mockSelected||remoteGraphData)?graphTypes.reduce((sum,type)=>sum+type.totalFields,0):null} page={page} onService={chooseService} onCreateService={submitService} onSnapshot={chooseSnapshot} onImport={importSDL} onPage={next=>{setPage(next);setQuery('');setDetail(null);setOperationKind('all');setSort('date')}} onMetric={summaryAction}/>{message&&<div className="toast" role="status">{message}<button onClick={()=>setMessage('')}>×</button></div>}<main className={`analytics-main page-${page}`}><div className="view-heading"><div><h1>{tabs.find(t=>t.id===page)?.label}</h1></div></div><div className="view-body">{!mockSelected&&(page!=='schema'||!remoteGraphData)?<div className="content-panel">
+  {page==='history'?<>
+    <div className="panel-tools"><button type="button" onClick={()=>requestAction('run')}>+ Новый прогон</button></div>
+    <Empty text="История прогонов для сервисов API пока не подключена."/>
+   </>:page!=='schema'?<Empty text="Данные прогонов для сервисов API пока недоступны."/>:
    <div className="empty-state" role={schemaError?'alert':'status'}>
-    <p>{catalog.state.kind==='error'?catalog.state.error.message:remoteMessage}</p>
+    <p>{!remoteService&&catalog.state.kind==='error'?catalog.state.error.message:remoteMessage}</p>
     {schemaError&&<button type="button" onClick={remoteList.kind==='error'?remote.snapshots.retry:remote.graph.retry}>Повторить</button>}
    </div>}
  </div>:page==='schema'?<><SchemaExplorer key={viewKey} types={graphTypes} coverageAvailable={coverageAvailable} emptyMessage={mockSelected?undefined:'В графе снимка нет типов.'} coverageRequest={explorerRequest} selectedType={detail?.kind==='type'?detail.id:detail?.kind==='field'?detail.id.split('.')[0]:null} selectedField={detail?.kind==='field'?detail.id:null} onType={name=>focusExplorer(name)} onField={(type,field)=>focusExplorer(type,field)} onClear={clearExplorerSelection} onOverview={showOverview}/><div className="content-panel"><div className="panel-tools schema-panel-tools"><span>{graphTypes.length} типов · {graph.edges.length} связей</span><div className="schema-view-actions">{mode==='graph'&&<button disabled={!graphTypes.length} onClick={()=>flow.fitView({padding:.12,minZoom:.3,maxZoom:1,duration:350})}>Вписать граф</button>}<div className="segmented" role="group" aria-label="Режим просмотра схемы"><button className={mode==='graph'?'active':''} aria-pressed={mode==='graph'} onClick={()=>setMode('graph')}>Граф</button><button className={mode==='table'?'active':''} aria-pressed={mode==='table'} onClick={()=>setMode('table')}>Таблица</button></div></div></div>{mode==='graph'?<><div className="flow-space">{!schemaId&&<div className="schema-empty-hint">Схем пока нет. Добавьте снимок через селектор в верхней панели.</div>}{!mockSelected&&!graphTypes.length&&<div className="schema-empty-hint">В графе снимка нет типов.</div>}<ReactFlow key={viewKey} nodes={graph.nodes} onNodesChange={onNodesChange} edges={graph.edges} onEdgeClick={(_,edge)=>{const field=edge.sourceHandle?.replace(/^field:/,'');if(!field)return;const dot=field.indexOf('.');if(dot>=0)openField(field.slice(0,dot),field.slice(dot+1))}} nodeTypes={{type:TypeNode}} edgeTypes={{routed:RoutedEdge}} nodesConnectable={false}><Background gap={18} color="#ece9f1"/><Controls showInteractive={false}/></ReactFlow></div></>:<SchemaCoverageTable

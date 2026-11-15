@@ -10,7 +10,9 @@ const roleNames: Record<Role, string> = {
   admin: 'Администратор',
 };
 
-export function AccountControl({auth}: {auth: ReturnType<typeof useAuth>}) {
+type Props = {auth: ReturnType<typeof useAuth>; loginHint?: string; onPromptClose: () => void};
+
+export function AccountControl({auth, loginHint, onPromptClose}: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const password = useRef<HTMLInputElement>(null);
   const account = useRef<HTMLDetailsElement>(null);
@@ -31,6 +33,11 @@ export function AccountControl({auth}: {auth: ReturnType<typeof useAuth>}) {
     document.addEventListener('pointerdown', dismiss);
     return () => document.removeEventListener('pointerdown', dismiss);
   }, [user]);
+
+  useEffect(() => {
+    if (!loginHint || user || !dialog.current || dialog.current.open) return;
+    dialog.current.showModal();
+  }, [loginHint, user]);
 
   function openLogin() {
     setLoginError(auth.error ? authErrorMessage(auth.error, 'restore') : '');
@@ -112,6 +119,7 @@ export function AccountControl({auth}: {auth: ReturnType<typeof useAuth>}) {
           if (password.current) password.current.value = '';
           setShowPassword(false);
           setLoginError('');
+          if (loginHint) onPromptClose();
         }}
         onClick={event => {
           if (event.target === event.currentTarget && !signingIn) dialog.current?.close();
@@ -119,6 +127,7 @@ export function AccountControl({auth}: {auth: ReturnType<typeof useAuth>}) {
       >
         <form onSubmit={submitLogin} aria-busy={signingIn}>
           <h2 id="auth-title">Вход в систему</h2>
+          {loginHint && <p>{loginHint}</p>}
           <fieldset disabled={signingIn}>
             <label htmlFor="auth-username">Логин</label>
             <input id="auth-username" name="username" autoComplete="username" autoFocus required

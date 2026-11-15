@@ -1,5 +1,13 @@
 import {requestJson} from './client';
 
+export type ServiceCreate = {
+  key: string;
+  name: string;
+  endpointUrl: string;
+  description?: string | null;
+  isPublic?: boolean;
+};
+
 export type ServiceOut = {
   id: string;
   key: string;
@@ -31,4 +39,11 @@ function decodeServices(data: unknown): ServiceOut[] {
 
 export function listServices(signal?: AbortSignal): Promise<ServiceOut[]> {
   return requestJson('/api/services', decodeServices, {signal});
+}
+
+export function createService(input: ServiceCreate, csrfToken: string): Promise<ServiceOut> {
+  return requestJson('/api/services', data => {
+    if (!isService(data)) throw new Error('Expected ServiceOut');
+    return data;
+  }, {method: 'POST', body: input, csrfToken});
 }

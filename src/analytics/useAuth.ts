@@ -30,5 +30,5 @@ export function useAuth() {
     return () => window.clearTimeout(timer);
   }, [controller, state.session]);
 
-  return {...state, restore: controller.restore, signIn: controller.signIn, signOut: controller.signOut};
+  return {...state, getCurrent: controller.snapshot, restore: controller.restore, signIn: controller.signIn, signOut: controller.signOut};
 }

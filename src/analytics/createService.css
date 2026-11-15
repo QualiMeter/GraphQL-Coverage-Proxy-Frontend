@@ -1,0 +1,44 @@
+.service-create-dialog {
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+
+.service-create-dialog fieldset {
+  min-inline-size: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.service-create-dialog form label {
+  margin-bottom: 5px;
+}
+
+.service-create-dialog form .service-create-public {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.service-create-dialog .service-create-public input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.service-create-dialog fieldset > small {
+  color: #526680;
+  font-size: 12px;
+}
+
+.service-create-dialog [aria-invalid="true"] {
+  border-color: #bd4854;
+}
+
+.service-create-dialog .create-service-actions button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 16px;
+}
