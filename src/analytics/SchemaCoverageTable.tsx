@@ -1,6 +1,6 @@
 import {useId, useMemo, useState} from 'react';
 import {Select} from '../components/Select';
-import type {SchemaType} from '../model';
+import type {GraphType} from '../model';
 import {
   coverageRows, defaultAdvancedFilters, filterCoverageRows,
   type AdvancedFilters, type CoverageFilter, type CoverageSort,
@@ -22,7 +22,8 @@ const advancedControls = [
 ] as const;
 
 type Props = {
-  types: SchemaType[];
+  types: GraphType[];
+  coverageAvailable?: boolean;
   sdl?: string;
   query: string;
   filter: CoverageFilter;
@@ -37,7 +38,7 @@ type Props = {
 const fieldCount = new Intl.NumberFormat('ru-RU');
 
 export function SchemaCoverageTable({
-  types, sdl, query, filter, sort, selectedField, onQuery, onFilter, onSort, onField,
+  types, coverageAvailable = true, sdl, query, filter, sort, selectedField, onQuery, onFilter, onSort, onField,
 }: Props) {
   const advancedId = useId();
   const [type, setType] = useState('');
@@ -49,14 +50,14 @@ export function SchemaCoverageTable({
     ...types.map(({name}) => name).sort((a, b) => a.localeCompare(b)).map(name => ({value: name, label: name})),
   ], [types]);
   const search = query.trim().toLowerCase();
-  const order = sort === 'hits-asc' || sort === 'hits' || sort === 'type-field' ? sort : 'date';
+  const order = sort === 'type-field' || coverageAvailable && (sort === 'hits-asc' || sort === 'hits') ? sort : 'date';
   const hasDeprecated = fields.some(({field}) => typeof field.deprecated === 'boolean');
-  const controls = advancedControls.filter(control => control.key !== 'deprecated' || hasDeprecated);
+  const controls = advancedControls.filter(control => (control.key !== 'deprecated' || hasDeprecated) && (control.key !== 'hits' || coverageAvailable));
   const activeAdvanced = controls.filter(control => advanced[control.key] !== 'all');
   const visibleFields = useMemo(() => filterCoverageRows(fields, {
-    ...advanced, deprecated: hasDeprecated ? advanced.deprecated : 'all',
-    type, search, coverage: filter,
-  }, order), [fields, advanced, hasDeprecated, type, search, filter, order]);
+    ...advanced, hits: coverageAvailable ? advanced.hits : 'all', deprecated: hasDeprecated ? advanced.deprecated : 'all',
+    type, search, coverage: coverageAvailable ? filter : 'all',
+  }, order), [fields, advanced, coverageAvailable, hasDeprecated, type, search, filter, order]);
 
   function updateAdvanced<Key extends keyof AdvancedFilters>(key: Key, value: AdvancedFilters[Key]) {
     setAdvanced(previous => ({...previous, [key]: value}));
@@ -79,7 +80,7 @@ export function SchemaCoverageTable({
             <span>Поиск по таблице</span>
             <input type="search" placeholder="Найти поле или тип" value={query} onChange={event => onQuery(event.target.value)}/>
           </label>
-          <Select
+          {coverageAvailable && <Select
             label="Покрытие"
             value={filter}
             modified={filter !== 'all'}
@@ -89,7 +90,7 @@ export function SchemaCoverageTable({
               {value: 'covered', label: 'Покрытые'},
               {value: 'uncovered', label: 'Не покрытые'},
             ]}
-          />
+          />}
           <Select label="Тип схемы" value={type} options={typeOptions} modified={Boolean(type)} onChange={setType}/>
           <Select
             label="Сортировка"
@@ -99,8 +100,10 @@ export function SchemaCoverageTable({
             options={[
               {value: 'date', label: 'По имени поля (А–Я)'},
               {value: 'type-field', label: 'По типу и полю'},
-              {value: 'hits-asc', label: 'Hits ↑ Возрастание'},
-              {value: 'hits', label: 'Hits ↓ Убывание'},
+              ...(coverageAvailable ? [
+                {value: 'hits-asc', label: 'Hits ↑ Возрастание'},
+                {value: 'hits', label: 'Hits ↓ Убывание'},
+              ] as const : []),
             ]}
           />
         </div>
@@ -129,7 +132,7 @@ export function SchemaCoverageTable({
         </div>}
       </div>
       <div className="table-scroll schema-table-scroll">
-        <table className="schema-coverage-table" aria-label="Покрытие полей схемы">
+        <table className="schema-coverage-table" aria-label={coverageAvailable ? "Покрытие полей схемы" : "Поля схемы"}>
           <colgroup>
             <col className="schema-table-type-col"/>
             <col className="schema-table-field-col"/>
@@ -159,10 +162,10 @@ export function SchemaCoverageTable({
                     onField(type, field.name);
                   }}>{field.name}</button></td>
                   <td><code>{field.returnType}</code></td>
-                  <td className="schema-table-hits">{fieldCount.format(field.hits)}</td>
-                  <td><span className={field.covered ? 'schema-table-status covered' : 'schema-table-status'}>
+                  <td className="schema-table-hits">{field.hits === null ? '—' : fieldCount.format(field.hits)}</td>
+                  <td>{field.covered === null ? '—' : <span className={field.covered ? 'schema-table-status covered' : 'schema-table-status'}>
                     {field.covered ? 'Покрыто' : 'Не покрыто'}
-                  </span></td>
+                  </span>}</td>
                 </tr>
               );
             })}

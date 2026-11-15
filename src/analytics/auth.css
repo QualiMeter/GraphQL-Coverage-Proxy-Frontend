@@ -1,0 +1,139 @@
+.auth-control {
+  position: relative;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.auth-control .auth-trigger {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  max-width: 150px;
+  min-height: 38px;
+  padding: 6px 12px;
+  border: 1px solid #cbd7ef;
+  border-radius: 10px;
+  background: #fff;
+  color: #3458b9;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-trigger:hover,
+.auth-account[open] .auth-trigger {
+  background: #edf3ff;
+}
+
+.auth-trigger span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-trigger::-webkit-details-marker { display: none; }
+
+.auth-account-panel {
+  position: absolute;
+  z-index: 1000;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(236px, calc(100vw - 24px));
+  padding: 12px;
+  border: 1px solid #dfe7f2;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 30px #19335924;
+  color: #17243b;
+  overflow-wrap: anywhere;
+}
+
+.auth-account-panel p {
+  margin: 4px 0 10px;
+  color: #526680;
+  font-size: 13px;
+}
+
+.auth-account-panel .auth-error { color: #aa3744; }
+
+.auth-account-panel button {
+  padding: 6px 9px;
+  border: 1px solid #d8e0ef;
+  border-radius: 8px;
+  background: #f7faff;
+  color: #3458b9;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.auth-control :is(button, summary):focus-visible {
+  outline: 2px solid #4361ee;
+  outline-offset: 2px;
+}
+
+.auth-dialog fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.auth-dialog form label { margin-bottom: 6px; }
+
+.auth-dialog .create-service-actions {
+  align-items: center;
+}
+
+.auth-dialog .create-service-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  min-height: 0;
+  margin: 0;
+  padding: 0 16px;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.auth-account-panel [aria-disabled="true"] {
+  opacity: .55;
+  cursor: wait;
+}
+
+.auth-password {
+  position: relative;
+}
+
+.auth-dialog .auth-password input {
+  padding-right: 46px;
+}
+
+.auth-password input::-ms-reveal {
+  display: none;
+}
+
+.auth-password button {
+  position: absolute;
+  inset: 4px 4px 4px auto;
+  width: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #526680;
+}
+
+.auth-password button:hover:not(:disabled) {
+  background: #edf3ff;
+  color: #3458b9;
+}
+
+@media (max-width: 1120px) {
+  .analytics-app .top-global { flex-wrap: wrap; }
+  .analytics-app .top-global .context-group { order: 2; }
+}
