@@ -5,7 +5,7 @@
 ## Запуск
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -33,10 +33,112 @@ Mock Customer API использует локальные снимки, прог
 метрик покрытия до подключения прогонов. Прогоны, операции и обращения API
 пока не подключены.
 
-- Vite проксирует `/api/` на `https://graphql.rebyte.fun` по умолчанию. Клиент использует относительные пути и `credentials: 'same-origin'`.
-- Для разработки cookie-авторизации скопируйте `.env.example` в `.env.local` и задайте `COVERAGE_API_PROXY_TARGET=http://localhost:8000`. На локальном backend требуются `COVERAGE_DEV_MODE=true` и `COVERAGE_PUBLIC_ORIGIN=http://localhost:5173` (точный origin приложения). Production проверяет собственный Origin. Прокси его не переписывает.
-- В production разместите frontend и `/api/` на одном origin. Ключ API и другие секреты остаются на сервере или в доверенном CLI. CSRF-токен хранится в памяти и передаётся в заголовке `X-CSRF-Token` при выходе.
+- Vite проксирует относительные `/api/...` на `https://graphql.rebyte.fun` по умолчанию. Клиент использует `credentials: 'same-origin'`; backend и PostgreSQL локально запускать не требуется.
+- Обычный proxy сохраняет исходный HTTP Origin. `changeOrigin` меняет Host, а режим production-авторизации ниже отдельно и условно меняет Origin.
+- В production frontend и `/api/` должны оставаться на одном HTTPS origin. Ключи API, пароли БД и серверные секреты во frontend и переменных Vite запрещены.
 
+## Локальный frontend с production-авторизацией
+
+Используйте Node.js 22 (как в CI), отдельный профиль браузера и отдельную тестовую
+учётную запись. Запросы идут в настоящий production API и его PostgreSQL.
+
+```bash
+npm ci
+cp .env.example .env.local
+```
+
+В `.env.local` явно включите серверный режим Vite:
+
+```dotenv
+COVERAGE_API_PROXY_TARGET=https://graphql.rebyte.fun
+COVERAGE_DEV_PROXY_PRODUCTION_AUTH=true
+```
+
+```bash
+npm run dev
+```
+
+Откройте **http://localhost:5173** и войдите через кнопку «Войти», используя
+существующую учётную запись оператора или администратора. Обе роли используют
+`POST /api/auth/login`; выдачу прав и доступ к сервисам определяет backend.
+`GET /api/auth/session` восстанавливает пользователя и CSRF-токен после обновления
+страницы. `POST /api/auth/logout` передаёт CSRF-токен из памяти в `X-CSRF-Token`.
+Автоматических повторов изменяющих запросов нет.
+
+Режим выключен по умолчанию. Он допускается только при `vite serve` в режиме
+`development` с указанным HTTPS target. Сервер слушает `localhost`, порт строго
+5173: если он занят, запуск завершается. Попытки `--host 0.0.0.0`, другого порта,
+включения CORS или middleware mode отклоняются после применения настроек CLI.
+Не публикуйте сервер через туннели, reverse proxy, контейнерный port forwarding
+или локальную сеть: это доверенный посредник с доступом к production.
+
+Для `/api` проверяются loopback-адрес соединения и точный Host `localhost:5173`.
+Origin подменяется на `https://graphql.rebyte.fun` только при исходном
+`Origin: http://localhost:5173` и отсутствующем либо `same-origin` Sec-Fetch-Site.
+Чужой Origin (включая другой порт, `127.0.0.1`, `null` и production origin),
+`cross-site`/`same-site` запросы отклоняются с 403 до обращения к backend.
+Без Origin разрешены только GET/HEAD/OPTIONS с безопасным Fetch Metadata;
+Origin при этом не добавляется. Изменяющий запрос без Origin отклоняется.
+CORS dev server отключён в этом режиме.
+
+Cookie, все Set-Cookie и CSRF передаются штатным HTTP proxy; Secure, HttpOnly,
+SameSite, Domain и Path не переписываются. HTTPS-сертификат backend проверяется,
+redirect не отслеживается. Proxy не создаёт CSRF-токены и не подменяет роли.
+При сборке и `vite preview` API proxy отсутствует даже с включённым флагом;
+переменные `COVERAGE_*` не экспортируются в клиентский bundle.
+
+### Ограничения cookie и браузеров
+
+Production использует host-only `__Host-coverage_session` с Secure, HttpOnly,
+SameSite=Lax и Path=/. Для HTTP localhost браузер должен поддерживать исключение
+Secure cookie для localhost, в том числе префикса `__Host-`. Поведение зависит от
+браузера, версии и политики профиля; совместимость всех браузеров не гарантируется.
+Если после успешного login сессия не сохраняется, проверьте причины блокировки
+cookie в DevTools → Network/Application (в Firefox — Storage). Используйте
+совместимый браузер либо production frontend по HTTPS. Не удаляйте Secure и не
+отключайте CSRF. Cookie с Domain production-домена на localhost работать не будет;
+proxy этот атрибут тоже не переписывает.
+См. [MDN: Set-Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie).
+
+Cookie localhost общие для всех портов. Отдельный профиль защищает от смешивания
+сессий других локальных приложений. Не храните пароль, cookie или CSRF в `.env`,
+localStorage, тестах, скриншотах или логах. Режим даёт возможность делать настоящие
+изменения в production: используйте только согласованные тестовые ресурсы.
+
+### Проверка и возврат в обычный режим
+
+Автотесты используют отдельный `vitest.config.ts` и временный HTTP upstream в
+памяти на loopback, без production и БД, даже если режим включён в `.env.local`. Для интеграционных тестов требуется свободный порт 5173; остановите dev server.
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+Для ручной проверки используйте отдельного тестового оператора:
+
+| Проверка через localhost | Ожидается |
+| --- | --- |
+| GET /api/services | 200, реальные доступные сервисы |
+| Login → GET /api/auth/session | Текущий пользователь и его роль |
+| Обновление страницы | Сессия и доступ сохраняются |
+| Выбор разрешённого сервиса | Снимки и граф из API, если они есть |
+| GET /api/auth/users без сессии | 401 |
+| GET /api/auth/users под оператором | 403 |
+| POST /api/auth/logout с действующей cookie, без/с неверным CSRF | 403, сессия остаётся |
+| Logout из UI → GET /api/auth/session | 204, затем анонимная сессия |
+| Вход под существующим admin | Сессия с ролью admin; права определяет backend |
+
+Проверьте Network/Console: отсутствие ошибок CORS, блокировки cookie и циклов
+повторной авторизации. Не проверяйте запись на рабочих сервисах. Для проверки
+CSRF используйте отклоняемый logout, не изменяющий бизнес-данные.
+
+Чтобы вернуться к обычному proxy, сначала выйдите из аккаунта, установите
+`COVERAGE_DEV_PROXY_PRODUCTION_AUTH=false` (или удалите флаг) и **перезапустите Vite**.
+Обычный режим продолжит анонимное чтение production API без подмены Origin.
+Для разработки с другим backend можно задать `COVERAGE_API_PROXY_TARGET`, оставив
+production-авторизацию выключенной.
 
 ## Вход
 
@@ -45,10 +147,10 @@ Mock Customer API использует локальные снимки, прог
 API доступны анонимно. Приватные сервисы требуют учётной записи и выдачи доступа
 администратором. Самостоятельной регистрации нет.
 
-Для входа в production откройте frontend на `https://graphql.rebyte.fun/coverage/`,
-чтобы Origin совпал с настройкой backend. Прокси Vite к production подходит для
-анонимного чтения. Для проверки входа через Vite используйте локальный backend и
-его настройки Origin, указанные выше.
+Для входа на сервере откройте `https://graphql.rebyte.fun/coverage/`.
+Для входа с локального frontend включите описанный выше режим production-авторизации.
+Пароли и CSRF-токены обрабатывает существующий механизм сессий; роли operator и
+admin поддерживаются одинаковым клиентом, без обходов серверных проверок.
 
 
 ## Production и CI/CD
