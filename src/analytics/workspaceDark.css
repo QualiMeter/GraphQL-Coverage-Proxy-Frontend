@@ -1,0 +1,184 @@
+:root {
+  --text: #17243b;
+  --text-secondary: #50627b;
+  --text-muted: #596b83;
+  --text-placeholder: #586a83;
+  --text-disabled: #68788d;
+  --page-surface: #edf2f8;
+  --panel-surface: #fff;
+  --graph-surface: #fafcff;
+  --raised-surface: #f4f7fc;
+  --hover-surface: #f3f6ff;
+  --selected-surface: #e7efff;
+  --separator: #d7e1ed;
+  --focus-ring: #4361ee;
+  --secondary: var(--text-secondary);
+  --muted: var(--text-muted);
+}
+
+:root[data-theme="dark"] {
+  color-scheme:dark;
+  --text:#e5edf9;
+  --text-secondary:#bacbe2;
+  --text-muted:#a6b8d0;
+  --text-placeholder:#aabdd6;
+  --text-disabled:#8496ad;
+  --page-surface:#0f1827;
+  --panel-surface:#162235;
+  --raised-surface:#202f47;
+  --hover-surface:#23354f;
+  --selected-surface:#2d456a;
+  --separator:#3c506c;
+  --focus-ring:#a4bdff;
+  --ink:var(--text);
+  --secondary:var(--text-secondary);
+  --muted:var(--text-muted);
+  --line:var(--separator);
+  --border:var(--separator);
+  --app-bg:var(--page-surface);
+  --surface:var(--panel-surface);
+  --primary:#9ab3ff;
+  --purple:#9ab3ff;
+  --primary-soft:#26395a;
+  --graph-dot:#354961;
+  --graph-edge-active:#a1b8ff;
+  --graph-edge-covered:#5cd8aa;
+  --graph-edge-muted:#8a9ab9;
+  background:var(--page-surface);
+  color:var(--ink);
+}
+[data-theme="dark"] :is(body,.analytics-app,.analytics-main,.flow-space) {
+  background:var(--page-surface); color:var(--ink);
+}
+[data-theme="dark"] :is(.top-global,.workspace-summary,.content-panel,.detail-panel,.schema-list,
+.schema-explorer,.schema-explorer-collapsed,.schema-panel-tools,.type-node,.type-node header,.schema-detail-sticky,
+.context-menu,.auth-account-panel,.create-service-dialog,.toast) {
+  background:var(--panel-surface); color:var(--ink); border-color:var(--border); box-shadow:none;
+}
+[data-theme="dark"] :is(.workspace-context,.settings-context,.snapshot-import-file,.snapshot-import-info,
+.run-dialog-context,.snapshot-import-methods,.schema-detail-stats,.code-view,.active-filter,.coverage-chip,
+.schema-detail-breadcrumb,.summary-track,.node-progress,.schema-empty-hint,.panel-tools,.segmented,.schema-panel-tools .segmented) {
+  background:var(--raised-surface); color:var(--ink); border-color:var(--border);
+}
+[data-theme="dark"] :is(.schema-list,.schema-explorer,.content-panel,.detail-panel,.context-menu,.auth-account-panel,.create-service-dialog)
+:is(h2,h3,h4,strong,label,dt,dd,code,small,p,legend,summary) { color:inherit; }
+[data-theme="dark"] :is(.top-brand strong,.context-trigger strong,.type-node header strong,.node-field code,
+.type-node header span,.type-node header b,.context-trigger .context-trigger-copy,.auth-account-panel p,
+.schema-panel-tools>span,.empty-state,.schema-detail-hint,.run-history-message,.schema-field-meta,
+.detail-list-row,.run-history-date,.run-history-snapshot,.run-history-select,.settings-dialog .settings-hint) {
+  color:var(--secondary);
+}
+[data-theme="dark"] :is(.top-brand strong,.context-trigger strong,.run-history-select,.type-node header strong) {color:var(--ink)}
+[data-theme="dark"] :is(input:not([type=checkbox],[type=radio]), textarea, select,
+.workspace-context .context-trigger,.run-control,.auth-trigger,.detail-head button,
+.create-service-actions button,.schema-panel-tools .schema-view-actions>button,.schema-panel-tools .segmented button,
+.auth-account-panel button,.snapshot-import-choose,.code-view button) {
+  background:var(--raised-surface); color:var(--ink); border-color:var(--border); box-shadow:none;
+}
+[data-theme="dark"] :is(.brand-glyph,.account-avatar,.run-control-primary,.primary,
+.workspace-context .context-trigger[aria-expanded=true],.workspace-context .context-trigger[aria-current],
+.schema-panel-tools .segmented button.active,.snapshot-import-methods input:checked+span) {
+  background:#2a4477; color:#e9efff; border-color:#536ea3;
+}
+[data-theme="dark"] :is(.run-control-finish,.form-error,.admin-error,.summary-error) {
+  color:#ffbac1; background:#442b3c; border-color:#704252;
+}
+[data-theme="dark"] :is(.context-action button,.settings-text-action,.code-key) {color:var(--primary)!important}
+[data-theme="dark"] :is(.context-action,.node-field,td,th,.detail-list-row,.schema-detail-nav,.detail-tabs) {border-color:var(--border)}
+[data-theme="dark"] :is(button:hover:not(:disabled),.node-field.active,.node-field:hover) {
+  background:var(--primary-soft);
+}
+[data-theme="dark"] :is(.run-badge[data-status=running],.run-badge[data-status=active],.status.ok,.run-state.active) {
+  background:#194036; color:#86e4bc;
+}
+[data-theme="dark"] :is(.run-badge[data-status=completed],.status.bad,.run-state.completed) {background:#304055;color:#c7d6ed}
+[data-theme="dark"] .react-flow {
+  --xy-controls-button-background-color:var(--raised-surface);
+  --xy-controls-button-background-color-hover:var(--primary-soft);
+  --xy-controls-button-color:var(--ink);
+  --xy-controls-button-border-color:var(--border);
+  --xy-attribution-background-color:var(--panel-surface);
+}
+[data-theme="dark"] :is(.schema-detail-nav button,.schema-detail-actions button,.schema-field-list button,
+.schema-linked-type,.schema-relations button,.settings-dialog form .settings-public,.schema-detail-stats span,
+.schema-explorer button,.schema-explorer label) {
+  background:var(--raised-surface);color:var(--ink);border-color:var(--border);box-shadow:none;
+}
+[data-theme="dark"] :is(.settings-dialog input[readonly],.settings-endpoint-help .endpoint-lock-note) {color:var(--secondary)}
+
+[data-theme="dark"] :is(.ui-select-menu,.schema-table-advanced:not([hidden]),.explorer-advanced,.explorer-fields,
+.snapshot-import-icon,.schema-field-list button,.schema-linked-type,.schema-relations button) {
+  background:var(--panel-surface);color:var(--ink);border-color:var(--border);
+}
+[data-theme="dark"] :is(.schema-table-tools button.ui-select-trigger,.ui-select-trigger,
+.schema-table-tools .schema-table-conditions button,.explorer-head button,.create-service-dialog .auth-password button) {
+  background:var(--raised-surface);color:var(--ink);border-color:var(--border);
+}
+[data-theme="dark"] :is(.ui-select-menu [role=option],.schema-table-field,.schema-table-type,
+.schema-coverage-table td code,.explorer-type,.explorer-field,.explorer-item,.explorer-result-count,.explorer-group h3) {
+  color:var(--ink);
+}
+[data-theme="dark"] :is(.ui-select-menu [aria-selected=true],.ui-select-menu [data-highlighted=true],
+.explorer-type:hover,.explorer-field:hover,
+.explorer-type.active,.explorer-field.active,.schema-table-tools label[data-active=true] input) {
+  background:var(--primary-soft);color:var(--ink);
+}
+[data-theme="dark"] .schema-coverage-table tr.selected .schema-table-field {color:var(--primary)}
+[data-theme="dark"] .schema-table-status {color:#ffda96;background:#443626}
+[data-theme="dark"] .schema-table-status.covered {color:#86e4bc;background:#194036}
+[data-theme="dark"] .create-service-dialog :is(p.form-error,.auth-error) {color:#ffbac1;background:#442b3c}
+[data-theme="dark"] .create-service-actions button.primary {background:#3d56c1;border-color:#607acf;color:#fff}
+
+
+/* Shared states apply to the same controls and table roles in either palette. */
+.table-scroll th { background:var(--raised-surface);color:var(--text-secondary);border-color:var(--separator); }
+.table-scroll td { color:var(--text);border-color:var(--separator); }
+.table-scroll td b { color:var(--text); }
+.table-scroll tbody tr:hover,
+.table-scroll tbody tr:focus-within,
+.schema-table-scroll .schema-coverage-table tbody tr:hover,
+.schema-table-scroll .schema-coverage-table tbody tr:focus-within { background:var(--hover-surface); }
+.table-scroll tbody tr.selected,
+.schema-table-scroll .schema-coverage-table tbody tr.selected { background:var(--selected-surface); }
+.table-scroll tbody tr.selected td:first-child { box-shadow:inset 3px 0 var(--focus-ring); }
+.analytics-app :is(input,textarea)::placeholder,
+.context-menu input::placeholder { color:var(--text-placeholder);opacity:1; }
+.analytics-app :is(button,input,textarea,select,summary):focus-visible,
+:is(.context-menu,.ui-select-menu) :is(button,input):focus-visible { outline:2px solid var(--focus-ring); }
+.analytics-app :is(button,input,textarea,select):disabled,
+.analytics-app button[aria-disabled=true] { color:var(--text-disabled);opacity:1;cursor:not-allowed; }
+
+[data-theme="dark"] :is(.table-scroll td code,.code-view pre,.code-view .code-toolbar,.detail-panel dd,
+  .detail-head strong,.settings-context code,.settings-dialog form .settings-public-copy,.run-dialog-context dd,
+  .snapshot-import-file-name strong,.snapshot-import-heading strong,.schema-detail-stats b,.schema-field-meta b,
+  .context-menu button strong,.auth-account-panel strong) { color:var(--text); }
+[data-theme="dark"] :is(.panel-tools label,.schema-table-tools label>span,.detail-panel dt,.detail-panel p,
+  .code-view .code-toolbar>span,.table-scroll .run-history-date,.table-scroll .run-history-snapshot,
+  .run-history-pagination span,.snapshot-import-info p,.settings-dialog .settings-public small,.node-field code,
+  .explorer-control-label,.explorer-coverage small,.snapshot-import-file-name span,
+  .context-trigger .context-trigger-copy,.schema-detail-hint,.schema-request-count,.auth-account-panel p) { color:var(--text-secondary); }
+[data-theme="dark"] :is(.detail-empty,.explorer-empty,.empty-state,.context-empty,.run-history-message,
+  .schema-table-empty,.schema-table-count,.create-service-dialog label span,.run-access-note) { color:var(--text-muted); }
+[data-theme="dark"] :is(.code-toolbar,.code-view .code-toolbar button,.panel-tools button,.detail-tabs button:not(.active),
+  .snapshot-import-dialog .snapshot-import-choose,.auth-dialog .auth-password button,.explorer-filter-line button) {
+  color:var(--text); background:var(--raised-surface); border-color:var(--separator);
+}
+[data-theme="dark"] :is(.detail-list-row:hover,.panel-tools button:hover:not(:disabled),
+  .snapshot-import-dialog .snapshot-import-choose:hover:not(:disabled),.code-view .code-toolbar button:hover) {
+  background:var(--hover-surface);color:var(--text);
+}
+[data-theme="dark"] :is(.table-scroll button.run-history-select:not(:disabled),.schema-table-field) {color:var(--text)}
+[data-theme="dark"] :is(.table-scroll button.run-history-select:hover:not(:disabled),.schema-table-field:hover,.detail-tabs button.active) {color:var(--primary)}
+[data-theme="dark"] :is(.explorer-coverage b,.schema-field-meta small,.schema-detail-stats small) {color:var(--text-secondary)}
+[data-theme="dark"] :is(.status.ok,.schema-table-status.covered,.schema-field-meta b.covered) {color:#86e4bc}
+[data-theme="dark"] :is(.admin-error,.summary-error,[role=alert].run-history-message) {
+  color:#ffbac1;background:#442b3c;border-color:#704252;
+}
+[data-theme="dark"] .workspace-context .run-control.run-control-finish {
+  color:#ffda96;background:#443626;border-color:#7c6240;
+}
+[data-theme="dark"] .workspace-context .run-control.run-control-finish:hover {background:#523f2b}
+:root[data-theme="dark"] .analytics-app :is(button,input,textarea,select):disabled,
+:root[data-theme="dark"] .analytics-app button[aria-disabled=true] {
+  color:var(--text-disabled);background:var(--panel-surface);opacity:1;cursor:not-allowed;
+}

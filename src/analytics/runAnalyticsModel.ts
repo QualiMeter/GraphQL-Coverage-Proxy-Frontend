@@ -2,7 +2,9 @@ import {ApiError} from '../api/client';
 import type {OperationOut, RunStats} from '../api/runAnalytics';
 
 export function operationLabel(name: string | null) {return name || 'Без имени'}
-export function millis(value: number | null | undefined) {return value == null ? '—' : `${new Intl.NumberFormat('ru-RU', {maximumFractionDigits: 2}).format(value)} мс`}
+const durationNumber = new Intl.NumberFormat('ru-RU', {maximumFractionDigits: 2});
+export function millisValue(value: number) {return durationNumber.format(value)}
+export function millis(value: number | null | undefined) {return value == null ? '—' : `${millisValue(value)} мс`}
 export function analysisErrors(stats: RunStats) {
   const counts = stats.analysisStatusCounts;
   return counts ? counts.parseError + counts.validationError + counts.internalError : null;
