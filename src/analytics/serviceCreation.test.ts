@@ -1,7 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {createService, type ServiceCreate} from '../api/services';
+import {createService, updateService, type ServiceCreate} from '../api/services';
 import type {Role, Session} from '../api/auth';
-import {canCreateService, serviceCreateError, validateServiceDraft} from './serviceCreation';
+import {canCreateService, endpointStatus, serviceCreateError, servicePatch, serviceUpdateError, validateServiceDraft} from './serviceCreation';
 
 const draft = {name: ' Orders ', key: 'orders-v2', endpointUrl: ' https://example.com/graphql ', description: ' ', isPublic: false};
 const input: ServiceCreate = {name: 'Orders', key: 'orders-v2', endpointUrl: 'https://example.com/graphql', isPublic: false};
@@ -73,5 +73,34 @@ describe('service creation', () => {
   it('rejects an invalid response instead of selecting an unconfirmed service', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({id: 'mock:customer'}, {status: 201})));
     await expect(createService(input, 'fake-for-test')).rejects.toMatchObject({kind: 'invalid-response'});
+  });
+});
+
+describe('service editing', () => {
+  it('sends only changed fields with CSRF and can clear description',async()=>{
+    const previous={...created,endpointUrl:null,isPublic:false,description:'Old'};
+    const result=validateServiceDraft({...draft,endpointUrl:''},previous);
+    if ('error' in result) throw new Error(result.error.message);
+    const patch=servicePatch(previous,result.input);
+    expect(patch).toEqual({description:null});
+    const updated={...previous,...patch};
+    const fetch=vi.fn().mockResolvedValue(Response.json(updated));
+    vi.stubGlobal('fetch',fetch);
+    await expect(updateService(previous.id,patch,'csrf-test')).resolves.toEqual(updated);
+    expect(fetch).toHaveBeenCalledWith(`/api/services/${previous.id}`,expect.objectContaining({
+      method:'PATCH',credentials:'same-origin',body:JSON.stringify({description:null}),
+    }));
+    expect(fetch.mock.calls[0][1].headers.get('X-CSRF-Token')).toBe('csrf-test');
+  });
+
+  it('distinguishes hidden endpoints and surfaces the active-run conflict',async()=>{
+    expect(endpointStatus(null,'admin')).toBe('Endpoint не настроен');
+    expect(endpointStatus(null,'operator')).toContain('скрыт');
+    expect(endpointStatus(null,'viewer')).toContain('правами');
+    const fetch=vi.fn().mockResolvedValue(new Response(null,{status:409}));
+    vi.stubGlobal('fetch',fetch);
+    const error=await updateService(created.id,{endpointUrl:input.endpointUrl},'csrf-test').catch((error:unknown)=>error);
+    expect(serviceUpdateError(error)).toContain('при активном прогоне');
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

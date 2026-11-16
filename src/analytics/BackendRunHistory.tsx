@@ -44,8 +44,8 @@ export function BackendRunHistory({serviceId, snapshots, snapshotsReady, selecte
               <tbody>{current.page.runs.map(run => {
                 const snapshot = snapshotForRun(run, snapshots);
                 const selected = run.id === selectedId;
-                return <tr key={run.id} className={selected ? 'selected' : undefined}>
-                  <td><button type="button" className="run-history-select" disabled={!snapshot} onClick={() => onSelect(run)} aria-pressed={selected}>{run.name}</button></td>
+                return <tr key={run.id} className={selected ? 'selected' : undefined} onClick={snapshot ? () => onSelect(run) : undefined}>
+                  <td><button type="button" className="run-history-select" disabled={!snapshot} onClick={event => {event.stopPropagation();onSelect(run)}} aria-pressed={selected}>{run.name}</button></td>
                   <td><span className="run-badge" data-status={run.status}>{runStatus(run.status)}</span></td>
                   <td className="run-history-date">{formatDate(run.startedAt)}</td>
                   <td className="run-history-date">{formatDate(run.finishedAt)}</td>

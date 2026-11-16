@@ -28,8 +28,10 @@ function decodeRun(data: unknown): RunOut {
   throw new Error('Expected RunOut');
 }
 
-export function listRuns(scope: RunScope, offset = 0, signal?: AbortSignal) {
-  const params = new URLSearchParams({limit: String(runPageSize), offset: String(offset)});
+export function listRuns(scope: RunScope, offset = 0, signal?: AbortSignal,
+  {status, limit = runPageSize}: {status?: 'running'; limit?: number} = {}) {
+  const params = new URLSearchParams({limit: String(limit), offset: String(offset)});
+  if (status) params.set('status', status);
   if (scope.snapshotId !== undefined) params.set('snapshotId', scope.snapshotId);
   else params.set('serviceId', scope.serviceId);
   return requestJson(`/api/runs?${params}`, (data, response): RunPage => {
@@ -39,8 +41,13 @@ export function listRuns(scope: RunScope, offset = 0, signal?: AbortSignal) {
       throw new Error('Run does not belong to the requested snapshot');
     }
     const total = response.headers.get('X-Total-Count');
-    return {runs, hasMore: total !== null && /^\d+$/.test(total) ? offset + runs.length < Number(total) : runs.length === runPageSize};
+    return {runs, hasMore: total !== null && /^\d+$/.test(total) ? offset + runs.length < Number(total) : runs.length === limit};
   }, {signal});
+}
+
+export async function hasActiveRun(serviceId: string, signal: AbortSignal) {
+  const {runs} = await listRuns({serviceId}, 0, signal, {status: 'running', limit: 1});
+  return runs.some(run => run.status === 'running');
 }
 
 export function createRun(snapshotId: string, name: string, csrfToken: string) {
@@ -59,4 +66,12 @@ export function finishRun(run: RunOut, csrfToken: string) {
     }
     return finished;
   }, {method: 'POST', csrfToken});
+}
+
+export async function findRun(snapshotId: string, runId: string, signal?: AbortSignal): Promise<RunOut | null> {
+  for (let offset = 0; ; offset += runPageSize) {
+    const page = await listRuns({snapshotId}, offset, signal);
+    const match = page.runs.find(run => run.id === runId);
+    if (match || !page.hasMore || !page.runs.length) return match ?? null;
+  }
 }

@@ -28,8 +28,8 @@ function RunModal({title, busy, onClose, children}: {
   );
 }
 
-export function CreateRunDialog({serviceName, snapshotName, onCreate, onClose}: {
-  serviceName: string; snapshotName: string; onCreate: (name: string) => Promise<RunOut | null>; onClose: () => void;
+export function CreateRunDialog({serviceName, endpointNote, snapshotName, onCreate, onClose}: {
+  serviceName: string; endpointNote: string; snapshotName: string; onCreate: (name: string) => Promise<RunOut | null>; onClose: () => void;
 }) {
   const [created, setCreated] = useState<RunOut | null>(null);
   const [busy, setBusy] = useState(false);
@@ -79,8 +79,9 @@ export function CreateRunDialog({serviceName, snapshotName, onCreate, onClose}: 
   return (
     <RunModal title={created ? 'Прогон создан' : 'Новый прогон'} busy={busy} onClose={onClose}>
       {close => created ? <>
+        <p>{endpointNote}.</p>
         <p>Сбор данных открыт. E2E-тесты нужно запустить отдельно.</p>
-        <p>Направьте запросы тестов через <code>{graphqlProxyUrl}</code> и передавайте ID в заголовке <code>X-Coverage-Run-Id</code>. Запросы также требуют авторизации proxy.</p>
+        <p>Направьте запросы тестов через <code>{graphqlProxyUrl}</code> и передавайте ID в заголовке <code>X-Coverage-Run-Id</code>. В доверенном CI используйте <code>X-Coverage-Api-Key</code> из секретов окружения согласно документации proxy.</p>
         <label htmlFor="created-run-id">ID прогона</label>
         <div className="run-copy">
           <input id="created-run-id" value={created.id} readOnly ref={copyingInput}/>

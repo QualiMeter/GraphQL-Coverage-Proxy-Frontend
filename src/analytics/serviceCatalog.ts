@@ -60,5 +60,11 @@ export function useServiceCatalog(localServices: Service[], sessionRevision: num
     retry();
   }
 
-  return {services, state, retry, refreshAfterCreate};
+  function replaceService(service: ServiceOut) {
+    setResult(current => current?.sessionRevision === sessionRevision && current.state.kind === 'ready'
+      ? {...current,state:{kind:'ready',services:current.state.services.map(item=>item.id===service.id?service:item)}}
+      : current);
+  }
+
+  return {services, state, retry, refreshAfterCreate, replaceService};
 }

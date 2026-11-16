@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {createRun, finishRun, listRuns, type RunOut} from '../api/runs';
-import {runActionError, runStatus, selectedRun, snapshotForRun} from './backendRuns';
+import {createRun, finishRun, findRun, hasActiveRun, listRuns, type RunOut} from '../api/runs';
+import {runActionError, runSelectionForHistory, runStatus, selectedRun, snapshotForRun} from './backendRuns';
 
 const serviceId = '00000000-0000-4000-8000-000000000010';
 const snapshotId = '00000000-0000-4000-8000-000000000020';
@@ -38,6 +38,19 @@ describe('backend run lifecycle', () => {
     expect(fetch).toHaveBeenCalledExactlyOnceWith(`/api/runs?limit=50&offset=50&serviceId=${serviceId}`, expect.objectContaining({signal}));
   });
 
+  it('checks for active runs across all snapshots of the service', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(Response.json([{...running, snapshotId: otherSnapshotId}]))
+      .mockResolvedValueOnce(Response.json([]));
+    vi.stubGlobal('fetch', fetch);
+    const {signal} = new AbortController();
+    await expect(hasActiveRun(serviceId, signal)).resolves.toBe(true);
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(
+      `/api/runs?limit=1&offset=0&status=running&serviceId=${serviceId}`, expect.objectContaining({signal}),
+    );
+    await expect(hasActiveRun(serviceId, signal)).resolves.toBe(false);
+  });
+
   it('finishes exactly the selected run and takes the end date from the server', async () => {
     const fetch = vi.fn().mockResolvedValue(Response.json(completed));
     vi.stubGlobal('fetch', fetch);
@@ -61,11 +74,25 @@ describe('backend run lifecycle', () => {
     const scope = 'shop:auth1';
     expect(snapshotForRun(running, snapshots)).toEqual(snapshots[1]);
     expect(snapshotForRun(running, [snapshots[0]])).toBeUndefined();
-    const selection = {scope, run: running};
+    const selection = runSelectionForHistory(running, scope, snapshots);
+    expect(runSelectionForHistory(running, scope, [snapshots[0]])).toBeNull();
+    expect(selectedRun(selection, scope, snapshots[0].id)).toBeNull();
     expect(selectedRun(selection, scope, snapshotId)).toBe(running);
     expect(selectedRun(selection, scope, otherSnapshotId)).toBeNull();
     expect(selectedRun(selection, 'another:auth1', snapshotId)).toBeNull();
     expect(selectedRun(selection, 'shop:auth2', snapshotId)).toBeNull();
+  });
+
+  it('restores the exact saved run across pages and does not replace it with a different run', async () => {
+    const newer={...running,id:'00000000-0000-4000-8000-000000000031'};
+    const fetch=vi.fn()
+      .mockResolvedValueOnce(Response.json([newer],{headers:{'X-Total-Count':'51'}}))
+      .mockResolvedValueOnce(Response.json([completed],{headers:{'X-Total-Count':'51'}}))
+      .mockResolvedValueOnce(Response.json([newer],{headers:{'X-Total-Count':'1'}}));
+    vi.stubGlobal('fetch',fetch);
+    await expect(findRun(snapshotId,running.id)).resolves.toEqual(completed);
+    expect(fetch.mock.calls[1][0]).toContain(`offset=50&snapshotId=${snapshotId}`);
+    await expect(findRun(snapshotId,running.id)).resolves.toBeNull();
   });
 
   it.each([[401, 'войдите'], [403, 'Недостаточно прав'], [404, 'недоступен'], [409, 'Статус прогона изменился']])(

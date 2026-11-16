@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {ApiError} from '../api/client';
-import {getSchemaGraph, getSchemaSdl, listSchemas} from '../api/schemas';
+import {type SchemaOut, getSchemaGraph, getSchemaSdl, listSchemas} from '../api/schemas';
 
 export type SchemaResource<T> =
   | {kind: 'idle' | 'loading'}
@@ -31,15 +31,22 @@ function useSchemaResource<T>(id: string | null, scope: string, load: (id: strin
     return () => controller.abort();
   }, [id, key, load]);
 
-  return {state: resourceForScope(result, key), retry: () => setAttempt(value => value + 1)};
+  function replace(update: (data:T)=>T) {
+    setResult(previous => previous?.key === key && previous.state.kind === 'ready'
+      ? {key:previous.key,state:{kind:'ready',data:update(previous.state.data)}} : previous);
+  }
+  return {state: resourceForScope(result, key), replace, retry: () => setAttempt(value => value + 1)};
 }
 
 export function useBackendSchema(serviceId: string | null, requestedId: string, serviceScope: string, snapshotScope: string) {
   const snapshots = useSchemaResource(serviceId, serviceScope, listSchemas);
   const items = snapshots.state.kind === 'ready' ? snapshots.state.data : [];
+  function replaceSnapshot(snapshot: SchemaOut) {
+    snapshots.replace(data=>data.map(item=>item.id===snapshot.id?snapshot:item));
+  }
   const selected = items.find(item => item.id === requestedId) ?? items[0] ?? null;
   const graph = useSchemaResource(selected?.id ?? null, snapshotScope, getSchemaGraph);
-  return {snapshots, items, selected, graph};
+  return {snapshots, items, selected, graph, replaceSnapshot};
 }
 
 export function useBackendSdl(schemaId: string | null, scope: string) {

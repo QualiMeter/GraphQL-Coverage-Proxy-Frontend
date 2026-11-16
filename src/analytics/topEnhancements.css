@@ -65,3 +65,12 @@
 }
 .top-metric:disabled{cursor:default}.top-metric:disabled:hover{background:transparent}
 .flow-space{position:relative}.schema-empty-hint{position:absolute;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%);max-width:300px;text-align:center;color:#6c7e99;font-size:14px;line-height:1.5;pointer-events:none}
+
+.request-summary-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.request-summary-heading h2{margin-bottom:0}
+.request-summary-heading .run-control{min-height:30px;padding:4px 10px;font-size:12px}
+.backend-run-history tr:has(.run-history-select:enabled){cursor:pointer}
+.run-statistics{padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px}
+.run-statistics summary{cursor:pointer;font-weight:600}
+.run-statistics .table-scroll{max-height:200px}
+.panel-tools .run-http-code{min-width:0;width:96px}
