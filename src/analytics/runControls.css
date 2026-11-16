@@ -306,7 +306,7 @@
 
 .backend-run-history .run-history-table th {
   padding: 10px 16px;
-  color: #526680;
+  color: var(--text-secondary);
   font-size: 13px;
   text-transform: none;
   letter-spacing: 0;
@@ -327,13 +327,13 @@
 
 .backend-run-history .run-history-table tbody tr:focus-within,
 .backend-run-history .run-history-table tbody tr:hover {
-  background: #f5f8ff;
+  background: var(--hover-surface);
 }
 
-.backend-run-history .run-history-table tbody tr.selected { background: #eaf1ff; }
+.backend-run-history .run-history-table tbody tr.selected { background: var(--selected-surface); }
 
 .backend-run-history .run-history-table tr.selected td:first-child {
-  box-shadow: inset 3px 0 #5572e8;
+  box-shadow: inset 3px 0 var(--focus-ring);
 }
 
 .run-history-select {
@@ -342,7 +342,7 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: #203553;
+  color: var(--text);
   text-align: left;
   font: inherit;
   font-size: 14px;
@@ -357,7 +357,7 @@
 }
 
 .run-history-select:disabled {
-  color: #68788f;
+  color: var(--text-disabled);
   cursor: default;
 }
 
@@ -373,8 +373,8 @@
   padding: 20px 16px;
   border: 1px solid #e1eaf6;
   border-radius: 11px;
-  background: #f7faff;
-  color: #465e7b;
+  background: var(--raised-surface);
+  color: var(--text-muted);
   font-size: 14px;
   text-align: center;
 }

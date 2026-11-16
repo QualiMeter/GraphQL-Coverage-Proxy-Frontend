@@ -1,0 +1,154 @@
+.operations-table-scroll {
+  container-type:inline-size;
+  overflow:auto;
+  min-width:0;
+}
+
+.operations-table-scroll:focus-visible {
+  outline:2px solid var(--focus-ring);
+  outline-offset:-2px;
+}
+
+.table-scroll .operations-table {
+  width:100%;
+  min-width:46rem;
+  border-collapse:separate;
+  border-spacing:0;
+  --query-surface:#eaf2ff;
+  --query-text:#2b5084;
+  --mutation-surface:#f4edfb;
+  --mutation-text:#674387;
+  --subscription-surface:#e7f4ef;
+  --subscription-text:#2f6455;
+  --operation-error:#963d40;
+}
+
+[data-theme="dark"] .table-scroll .operations-table {
+  --query-surface:#253b59;
+  --query-text:#c4dcff;
+  --mutation-surface:#423052;
+  --mutation-text:#e8cffb;
+  --subscription-surface:#233f3b;
+  --subscription-text:#b4e2d3;
+  --operation-error:#ffb5b8;
+}
+
+.table-scroll .operations-table :is(th,td) {
+  padding:9px 14px;
+  border:0;
+  border-bottom:1px solid var(--separator);
+  text-align:left;
+  vertical-align:middle;
+}
+
+.table-scroll .operations-table th {
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:var(--raised-surface);
+  color:var(--text-secondary);
+  font-size:13px;
+  font-weight:650;
+  letter-spacing:normal;
+  text-transform:none;
+  white-space:nowrap;
+}
+
+.table-scroll .operations-table td {
+  color:var(--text);
+  font-size:14px;
+  line-height:1.35;
+}
+
+.table-scroll .operations-table :is(th,td):first-child {
+  min-width:10.5rem;
+  padding-left:16px;
+}
+
+.table-scroll .operations-table :is(th,td):nth-child(n+3) {
+  text-align:center;
+  white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+
+.table-scroll .operations-table td:last-child {
+  padding-inline:22px;
+}
+
+.operations-fields-heading {
+  display:inline-grid;
+  grid-template-columns:20px auto 20px;
+  align-items:center;
+  gap:5px;
+}
+
+.operations-fields-heading > span { grid-column:2; }
+
+.operations-fields-info {
+  display:grid;
+  place-items:center;
+  width:20px;
+  height:20px;
+  padding:0;
+  border:0;
+  border-radius:4px;
+  color:inherit;
+  background:transparent;
+}
+
+.operations-fields-info:hover { color:var(--primary); }
+.operations-fields-info:focus-visible { outline:2px solid var(--focus-ring); outline-offset:1px; }
+.operations-fields-heading .action-tooltip-label {
+  width:16rem;
+  white-space:normal;
+  text-align:left;
+  font-weight:500;
+}
+
+.table-scroll .operations-table tbody tr { height:46px; }
+.table-scroll .operations-table tbody tr:hover,
+.table-scroll .operations-table tbody tr:focus-within { background:var(--hover-surface); }
+.table-scroll .operations-table tbody tr.selected { background:var(--selected-surface); }
+.table-scroll .operations-table tbody tr.selected td:first-child { box-shadow:inset 3px 0 var(--focus-ring); }
+
+.operations-table .operation-name {
+  padding:2px 0;
+  border:0;
+  border-radius:4px;
+  background:transparent;
+  color:var(--text);
+  text-align:left;
+  font:inherit;
+  font-size:14px;
+  font-weight:650;
+  overflow-wrap:anywhere;
+}
+
+.operations-table .operation-name:hover { color:var(--primary); }
+.operations-table .operation-name:focus-visible {
+  outline:2px solid var(--focus-ring);
+  outline-offset:3px;
+}
+
+.operations-table .operation-kind {
+  display:inline-block;
+  padding:2px 8px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:650;
+  white-space:nowrap;
+}
+
+.operation-kind[data-kind="query"] { background:var(--query-surface); color:var(--query-text); }
+.operation-kind[data-kind="mutation"] { background:var(--mutation-surface); color:var(--mutation-text); }
+.operation-kind[data-kind="subscription"] { background:var(--subscription-surface); color:var(--subscription-text); }
+
+.operations-table :is(.operation-count,.operation-duration,.operation-error) { font-weight:650; }
+.table-scroll .operations-table .operation-error { color:var(--operation-error); }
+.table-scroll .operations-table .operation-zero,
+.operations-table .operation-unit { color:var(--text-secondary); }
+.operations-table .operation-unit { font-size:13px; }
+
+@media (max-width:1300px) {
+  .table-scroll .operations-table :is(th,td) { padding-inline:10px; }
+}

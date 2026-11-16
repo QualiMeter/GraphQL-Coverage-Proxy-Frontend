@@ -22,7 +22,7 @@
 }
 
 .auth-trigger:hover,
-.auth-account[open] .auth-trigger {
+.auth-account .auth-trigger[aria-expanded=true] {
   background: #edf3ff;
 }
 
@@ -31,41 +31,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.auth-trigger::-webkit-details-marker { display: none; }
-
-.auth-account-panel {
-  position: absolute;
-  z-index: 1000;
-  top: calc(100% + 8px);
-  right: 0;
-  width: min(236px, calc(100vw - 24px));
-  padding: 12px;
-  border: 1px solid #dfe7f2;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 12px 30px #19335924;
-  color: #17243b;
-  overflow-wrap: anywhere;
-}
-
-.auth-account-panel p {
-  margin: 4px 0 10px;
-  color: #526680;
-  font-size: 13px;
-}
-
-.auth-account-panel .auth-error { color: #aa3744; }
-
-.auth-account-panel button {
-  padding: 6px 9px;
-  border: 1px solid #d8e0ef;
-  border-radius: 8px;
-  background: #f7faff;
-  color: #3458b9;
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .auth-control :is(button, summary):focus-visible {

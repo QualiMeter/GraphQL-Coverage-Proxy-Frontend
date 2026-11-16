@@ -1,38 +1,60 @@
-import {useEffect, useRef, useState, type FormEvent} from 'react';
+import {useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent} from 'react';
 import {authErrorMessage, type Role} from '../api/auth';
 import type {useAuth} from './useAuth';
 import './auth.css';
+import {AccountIcon} from './AccountIcon';
 
-const roleNames: Record<Role, string> = {
+export const roleNames: Record<Role, string> = {
   viewer: 'Наблюдатель',
   analyst: 'Аналитик',
   operator: 'Оператор',
   admin: 'Администратор',
 };
 
-type Props = {auth: ReturnType<typeof useAuth>; loginHint?: string; onPromptClose: () => void};
+type Props = {auth: ReturnType<typeof useAuth>; loginHint?: string; onPromptClose: () => void; onAdmin:()=>void};
 
-export function AccountControl({auth, loginHint, onPromptClose}: Props) {
+export function AccountControl({auth, loginHint, onPromptClose, onAdmin}: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const password = useRef<HTMLInputElement>(null);
-  const account = useRef<HTMLDetailsElement>(null);
-  const accountTrigger = useRef<HTMLElement>(null);
+  const account = useRef<HTMLDivElement>(null);
+  const accountTrigger = useRef<HTMLButtonElement>(null);
+  const profilePanel = useRef<HTMLElement>(null);
+  const panelId=useId();
   const loginTrigger = useRef<HTMLButtonElement>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [logoutError, setLogoutError] = useState('');
+  const [profileOpen,setProfileOpen]=useState(false);
   const user = auth.session?.user;
 
   useEffect(() => {
-    if (!user) return;
-    dialog.current?.close();
-    function dismiss(event: PointerEvent) {
-      const menu = account.current;
-      if (menu && !menu.contains(event.target as Node)) menu.open = false;
-    }
-    document.addEventListener('pointerdown', dismiss);
-    return () => document.removeEventListener('pointerdown', dismiss);
+    if (user) dialog.current?.close();
   }, [user]);
+  useEffect(() => {
+    if(!user||!profileOpen)return;
+    profilePanel.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    function dismiss(event:PointerEvent) {
+      if(!account.current?.contains(event.target as Node))setProfileOpen(false);
+    }
+    document.addEventListener('pointerdown',dismiss);
+    return ()=>document.removeEventListener('pointerdown',dismiss);
+  },[user,profileOpen]);
+
+  function closeProfile() {
+    setProfileOpen(false);
+    accountTrigger.current?.focus();
+  }
+  function profileKeys(event:KeyboardEvent) {
+    if(event.key==='Escape'&&profileOpen){event.preventDefault();closeProfile();return}
+    if(!profileOpen||!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
+    const actions=[...(profilePanel.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')??[])];
+    if(!actions.length)return;
+    event.preventDefault();
+    const index=actions.indexOf(document.activeElement as HTMLButtonElement);
+    const next=event.key==='Home'?0:event.key==='End'?actions.length-1:
+      event.key==='ArrowDown'?(index+1)%actions.length:index<=0?actions.length-1:index-1;
+    actions[next].focus();
+  }
 
   useEffect(() => {
     if (!loginHint || user || !dialog.current || dialog.current.open) return;
@@ -52,6 +74,8 @@ export function AccountControl({auth, loginHint, onPromptClose}: Props) {
     setLoginError('');
     try {
       await auth.signIn(username, input.value);
+      setProfileOpen(false);
+      setLogoutError('');
       dialog.current?.close();
       requestAnimationFrame(() => accountTrigger.current?.focus());
     } catch (error) {
@@ -68,6 +92,7 @@ export function AccountControl({auth, loginHint, onPromptClose}: Props) {
     setLogoutError('');
     try {
       await auth.signOut();
+      setProfileOpen(false);
       requestAnimationFrame(() => loginTrigger.current?.focus());
     } catch (error) {
       setLogoutError(authErrorMessage(error, 'logout'));
@@ -78,33 +103,26 @@ export function AccountControl({auth, loginHint, onPromptClose}: Props) {
   return (
     <div className="auth-control">
       {user ? (
-        <details
-          className="auth-account"
-          key={user.id}
-          ref={account}
-          onBlur={event => {
-            if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
-          }}
-          onKeyDown={event => {
-            if (event.key === 'Escape' && event.currentTarget.open) {
-              event.preventDefault();
-              event.currentTarget.open = false;
-              accountTrigger.current?.focus();
-            }
-          }}
-        >
-          <summary ref={accountTrigger} className="auth-trigger" title={user.username}>
-            <span>{user.username}</span><span className="auth-chevron" aria-hidden="true">⌄</span>
-          </summary>
-          <section className="auth-account-panel" aria-label="Учётная запись">
-            <strong>{user.username}</strong>
-            <p>{roleNames[user.role]}</p>
-            {logoutError && <p className="auth-error" role="alert">{logoutError}</p>}
-            <button type="button" onClick={() => void submitLogout()} aria-disabled={auth.pending === 'logout'}>
-              {auth.pending === 'logout' ? 'Выходим…' : 'Выйти'}
-            </button>
-          </section>
-        </details>
+        <div className="auth-account profile-control" ref={account} onKeyDown={profileKeys} onBlur={event=>{
+          if(event.relatedTarget&&!event.currentTarget.contains(event.relatedTarget))setProfileOpen(false);
+        }}>
+          <button type="button" ref={accountTrigger} className="auth-trigger account-avatar" title={user.username}
+            aria-label={`Аккаунт · ${user.username}`} aria-expanded={profileOpen} aria-controls={profileOpen?panelId:undefined}
+            onClick={()=>profileOpen?closeProfile():setProfileOpen(true)} onKeyDown={event=>{
+              if(!profileOpen&&event.key==='ArrowDown'){event.preventDefault();setProfileOpen(true)}
+            }}>
+            <span aria-hidden="true">{user.username.slice(0,2).toUpperCase()}</span>
+          </button>
+          {profileOpen&&<section id={panelId} ref={profilePanel} className="profile-panel" aria-label="Учётная запись">
+            <div className="profile-identity">
+              <span className="profile-initials" aria-hidden="true">{user.username.slice(0,2).toUpperCase()}</span>
+              <div><strong>{user.username}</strong><small>{roleNames[user.role]}</small></div>
+            </div>
+            <ProfileActions role={user.role}
+              onAdmin={()=>{closeProfile();onAdmin()}} onLogout={()=>void submitLogout()}
+              loggingOut={auth.pending==='logout'} error={logoutError}/>
+          </section>}
+        </div>
       ) : (
         <button ref={loginTrigger} className="auth-trigger" type="button" onClick={openLogin}>
           Войти
@@ -167,4 +185,19 @@ export function AccountControl({auth, loginHint, onPromptClose}: Props) {
       </dialog>
     </div>
   );
+}
+
+
+export function ProfileActions({role,onAdmin,onLogout,loggingOut,error}:{
+  role:Role;onAdmin:()=>void;onLogout:()=>void;loggingOut:boolean;error:string;
+}) {
+  return <>
+    {role==='admin'&&<div className="profile-actions">
+      <button type="button" onClick={onAdmin}><AccountIcon name="users"/>Управление пользователями</button>
+    </div>}
+    <div className="profile-actions">
+      <button type="button" onClick={onLogout} disabled={loggingOut}><AccountIcon name="logout"/>{loggingOut?'Выходим…':'Выйти'}</button>
+      {error&&<p className="profile-error" role="alert">{error}</p>}
+    </div>
+  </>;
 }

@@ -4,6 +4,7 @@ import type {GraphType} from '../model';
 import {useBackendRead} from './useBackendRead';
 import {analyticsError, analysisErrors, matchesOperation, mayReadJournal, millis, operationLabel} from './runAnalyticsModel';
 import {CodeView} from './CodeView';
+import {OperationsTable} from './OperationsTable';
 
 type Props = {
   runId: string; scope: string; revision: number; role?: string;
@@ -56,12 +57,11 @@ export function BackendOperations(p:Props) {
         <button onClick={()=>{setSearch('');setKind('');setErrors(false);setOrder('count');p.onClearContext()}}>Сбросить</button>
       </div>
       {p.field&&<div className="active-filter">Поле: {p.field} <button onClick={p.onClearContext} aria-label="Убрать фильтр поля">×</button></div>}
-      {visible.length?<div className="table-scroll"><table aria-label="Операции прогона">
-        <thead><tr><th>Операция</th><th>Тип</th><th>Выполнений</th><th>HTTP</th><th>GraphQL</th><th>Среднее</th><th>Поля</th></tr></thead>
-        <tbody>{visible.map(op=><tr key={op.operationKey} className={selection===op.operationKey?'selected':undefined} onClick={()=>setSelection(op.operationKey)}>
-          <td><button className="run-history-select" onClick={()=>setSelection(op.operationKey)}>{operationLabel(op.operationName)}</button></td><td>{op.operationType}</td><td>{op.requestCount}</td><td>{op.httpErrorCount}</td><td>{op.graphqlErrorCount}</td><td>{millis(op.avgDurationMs)}</td><td>{op.fields.length}</td>
-        </tr>)}</tbody>
-      </table></div>:<Result {...result} empty="Операции не найдены."/>}
+      {visible.length?<OperationsTable selectedId={selection} onSelect={setSelection} rows={visible.map(op=>({
+        id:op.operationKey,name:operationLabel(op.operationName),kind:op.operationType,
+        count:op.requestCount,httpErrors:op.httpErrorCount,graphqlErrors:op.graphqlErrorCount,
+        averageMs:op.avgDurationMs,fieldCount:op.fields.length,
+      }))}/>:<Result {...result} empty="Операции не найдены."/>}
     </div>
     {selected&&<aside className="detail-panel">
       <DetailHead onClose={()=>setSelection('')}/>

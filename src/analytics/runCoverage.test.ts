@@ -1,7 +1,8 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {getRunCoverage, getSchemaGraph, type RunCoverageGraph} from '../api/schemas';
 import {schemaGraphTypes} from './backendSchema';
-import {coverageErrorMessage, coverageForRequest} from './useRunCoverage';
+import {coverageErrorMessage, coverageFailure, coverageForRequest} from './useRunCoverage';
+import {runAnalyticsErrors} from './useRunAnalytics';
 import {relationsFor} from './schemaInvestigation';
 import {graphEdges, layout} from '../graph/transform';
 import {coverageRows, defaultAdvancedFilters, filterCoverageRows} from './coverageTableFilters';
@@ -74,6 +75,32 @@ describe('coverage of the selected backend run', () => {
     const denied = new ApiError('http', 'Недостаточно прав.', 403);
     expect(coverageForRequest({...prior, request: 'refresh', data: null, error: denied}, 'run-a', 'refresh'))
       .toEqual({data: null, loading: false, error: denied});
+  });
+
+  it('reports which part of a joint refresh failed', () => {
+    const unavailable = new ApiError('http', 'API временно недоступен.', 503);
+    const denied = new ApiError('http', 'Доступ запрещён.', 403);
+    expect(runAnalyticsErrors(unavailable, undefined, ' Показано последнее доступное покрытие.')).toEqual([
+      'Покрытие схемы — API временно недоступен. Показано последнее доступное покрытие.',
+    ]);
+    expect(runAnalyticsErrors(null, denied)).toEqual([
+      'Статистика обращений — Недостаточно прав для просмотра данных.',
+    ]);
+    expect(runAnalyticsErrors(unavailable, denied)).toHaveLength(2);
+    expect(runAnalyticsErrors(null)).toEqual([]);
+  });
+
+  it('retains the last coverage on temporary errors only for the same run and selection', () => {
+    const prior = {scope: 'run-a', request: 'initial', data: initial, error: null};
+    const unavailable = new ApiError('http', 'API временно недоступен.', 503);
+    const denied = new ApiError('http', 'Доступ запрещён.', 403);
+    const failedRefresh = coverageFailure(prior, 'run-a', 'refresh', unavailable);
+    expect(coverageForRequest(failedRefresh, 'run-a', 'refresh'))
+      .toEqual({data: initial, loading: false, error: unavailable});
+    expect(coverageForRequest(failedRefresh, 'run-b', 'refresh'))
+      .toEqual({data: null, loading: true, error: null});
+    expect(coverageFailure(prior, 'run-a-reselected', 'refresh', unavailable).data).toBeNull();
+    expect(coverageFailure(prior, 'run-a', 'refresh', denied).data).toBeNull();
   });
 
   it('treats structural graph zeros as missing metrics when there is no run', async () => {

@@ -24,11 +24,10 @@ export function coverageErrorMessage(error: ApiError) {
   return error.message;
 }
 
-export function useRunCoverage(runId: string | null, schemaId: string | null, context: string, status?: string) {
+export function useRunCoverage(runId: string | null, schemaId: string | null, context: string, revision: number, status?: string) {
   const scope = runId && schemaId ? JSON.stringify([context, runId, schemaId]) : null;
-  const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<CoverageResult>();
-  const request = JSON.stringify([status, attempt]);
+  const request = JSON.stringify([status, revision]);
 
   useEffect(() => {
     if (!scope || !runId || !schemaId) return;
@@ -38,10 +37,16 @@ export function useRunCoverage(runId: string | null, schemaId: string | null, co
         if (!controller.signal.aborted) setResult({scope, request, data, error: null});
       })
       .catch((error: ApiError) => {
-        if (!controller.signal.aborted) setResult({scope, request, data: null, error});
+        if (controller.signal.aborted) return;
+        setResult(previous => coverageFailure(previous, scope, request, error));
       });
     return () => controller.abort();
   }, [scope, runId, schemaId, request]);
 
-  return {...coverageForRequest(result, scope, request), refresh: () => setAttempt(value => value + 1)};
+  return coverageForRequest(result, scope, request);
+}
+
+export function coverageFailure(previous: CoverageResult | undefined, scope: string, request: string, error: ApiError): CoverageResult {
+  const temporary = error.kind === 'network' || (error.status ?? 0) >= 500;
+  return {scope, request, data: temporary && previous?.scope === scope ? previous.data : null, error};
 }
