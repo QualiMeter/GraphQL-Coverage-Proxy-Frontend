@@ -11,6 +11,10 @@ export function snapshotForRun<T extends {id: string}>(run: RunOut, snapshots: r
   return snapshots.find(snapshot => snapshot.id === run.snapshotId);
 }
 
+export function runSelectionForHistory(run: RunOut, scope: string, snapshots: readonly {id:string}[]): RunSelection | null {
+  return snapshotForRun(run,snapshots) ? {scope, run} : null;
+}
+
 export function runStatus(status: string) {
   switch (status) {
     case 'active':

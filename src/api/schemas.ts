@@ -96,6 +96,13 @@ export function importSchemaIntrospection(serviceId: string, csrfToken: string) 
   return importSnapshot('/api/schemas/import/introspection', {serviceId}, csrfToken);
 }
 
+export function renameSchema(snapshot: SchemaOut, displayName: string | null, csrfToken: string) {
+  return requestJson(`/api/schemas/${encodeURIComponent(snapshot.id)}`, data => {
+    if (!isSnapshot(data, snapshot.serviceId) || data.id !== snapshot.id) throw new Error('Expected updated SchemaOut');
+    return data;
+  }, {method: 'PATCH', body: {displayName}, csrfToken});
+}
+
 export type RunCoverageGraph = CoverageGraph & {
   runId: string;
   summary: CoverageSummary & {coveragePercent: number};

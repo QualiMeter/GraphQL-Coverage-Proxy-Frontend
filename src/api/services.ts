@@ -47,3 +47,12 @@ export function createService(input: ServiceCreate, csrfToken: string): Promise<
     return data;
   }, {method: 'POST', body: input, csrfToken});
 }
+
+export type ServiceUpdate = Partial<Omit<ServiceCreate, 'key'>>;
+
+export function updateService(id: string, input: ServiceUpdate, csrfToken: string): Promise<ServiceOut> {
+  return requestJson(`/api/services/${encodeURIComponent(id)}`, data => {
+    if (!isService(data) || data.id !== id) throw new Error('Expected updated ServiceOut');
+    return data;
+  }, {method: 'PATCH', body: input, csrfToken});
+}

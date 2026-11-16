@@ -1,0 +1,151 @@
+.create-service-dialog.settings-dialog {
+  width: min(var(--settings-width, 440px), calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+}
+
+.create-service-dialog.service-settings-dialog { --settings-width: 480px; }
+
+.settings-dialog form { padding: clamp(16px, 5vw, 26px); }
+
+.settings-dialog h2 {
+  margin: 0 0 16px;
+  font-size: clamp(20px, 4.5vw, 23px);
+  line-height: 1.25;
+}
+
+.settings-dialog form label {
+  margin: 16px 0 6px;
+  font-size: 14px;
+}
+
+.settings-dialog form fieldset > label:first-child { margin-top: 0; }
+
+.settings-dialog input:not([type="checkbox"]),
+.settings-dialog textarea {
+  min-width: 0;
+  height: 42px;
+  font-size: 14px;
+  color: #17243b;
+}
+
+.settings-dialog textarea { min-height: 76px; line-height: 1.45; }
+
+.settings-dialog input[readonly] {
+  background: #f1f5fb;
+  border-color: #dce5f1;
+  color: #526680;
+}
+
+.settings-dialog input:not([type="checkbox"]):hover:not(:disabled, [readonly]),
+.settings-dialog textarea:hover:not(:disabled) { border-color: #9caecc; }
+
+.settings-dialog input[aria-invalid="true"] { border-color: #bd4854; }
+
+.settings-context,
+.settings-dialog form .settings-public {
+  padding: 11px 13px;
+  border: 1px solid #e1e9f4;
+  border-radius: 10px;
+  background: #f7faff;
+}
+
+.settings-context {
+  display: grid;
+  gap: 4px;
+  margin: 14px 0 16px;
+  overflow-wrap: anywhere;
+}
+
+.settings-context dt,
+.settings-dialog .settings-hint,
+.settings-dialog .settings-public small {
+  color: #526680;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-context dd { margin: 0; font-size: 14px; }
+.settings-context code { color: #263750; }
+
+.settings-endpoint-help:not(:empty) {
+  display: grid;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.settings-endpoint-help .endpoint-lock-note { color: #455d83; font-weight: 600; }
+
+.settings-dialog form .settings-public {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+.settings-dialog form .settings-public:hover { border-color: #b6c7e5; }
+.settings-dialog fieldset:disabled .settings-public { opacity: .7; cursor: default; }
+
+.settings-dialog form .settings-public-copy {
+  display: grid;
+  gap: 3px;
+  color: #263750;
+}
+
+.settings-public input[type="checkbox"] {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  padding: 0;
+  accent-color: var(--primary, #4361ee);
+}
+
+.settings-dialog .create-service-actions {
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.settings-dialog .create-service-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  margin: 0;
+  padding: 0 clamp(10px, 3.2vw, 16px);
+  border-radius: 9px;
+  font-size: 14px;
+}
+
+.settings-dialog .settings-text-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  margin-top: 5px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #3458b9;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-dialog .settings-text-action:hover:not(:disabled) { text-decoration: underline; }
+.settings-dialog button:disabled { opacity: .55; cursor: default; }
+
+.settings-dialog button:focus-visible,
+.settings-dialog input[type="checkbox"]:focus-visible {
+  outline: 2px solid #4361ee;
+  outline-offset: 2px;
+}
+
+
+.settings-dialog .create-service-actions button:hover:not(:disabled) { background: #f1f5fb; }
+.settings-dialog .create-service-actions button.primary:hover:not(:disabled) {
+  background: #3653d5;
+  border-color: #3653d5;
+}

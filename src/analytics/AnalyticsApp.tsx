@@ -19,16 +19,21 @@ import {isMockService, MOCK_SERVICE_ID} from './mockService';
 import {useServiceCatalog} from './serviceCatalog';
 import {useAuth} from './useAuth';
 import {ApiError} from '../api/client';
-import {createService, type ServiceCreate} from '../api/services';
+import {createService, updateService, type ServiceCreate, type ServiceUpdate} from '../api/services';
 import {canCreateService} from './serviceCreation';
 import {workspaceActionFor, type WorkspaceAction, type WorkspaceIntent} from './workspaceActions';
 import {schemaGraphTypes, snapshotOption} from './backendSchema';
 import {useBackendSchema, useBackendSdl} from './useBackendSchema';
 import {coverageErrorMessage, useRunCoverage} from './useRunCoverage';
-import {importSchemaIntrospection, importSchemaSdl} from '../api/schemas';
+import {importSchemaIntrospection, importSchemaSdl, renameSchema} from '../api/schemas';
 import type {SnapshotImport} from './schemaImport';
-import {createRun as postRun, finishRun as postFinishRun, type RunOut} from '../api/runs';
-import {runActionError, selectedRun, snapshotForRun, type RunSelection} from './backendRuns';
+import {createRun as postRun, finishRun as postFinishRun, findRun, type RunOut} from '../api/runs';
+import {runActionError, selectedRun, runSelectionForHistory, type RunSelection} from './backendRuns';
+import {getRunStats} from '../api/runAnalytics';
+import {useBackendRead} from './useBackendRead';
+import {BackendOperations, BackendRequests} from './BackendRunAnalytics';
+import {analyticsError, mayReadJournal} from './runAnalyticsModel';
+import {readWorkspace, saveWorkspace} from './workspaceSelection';
 import {BackendRunHistory} from './BackendRunHistory';
 import {FinishRunDialog} from './RunDialogs';
 import {summaryDestination} from './navigation';
@@ -42,7 +47,7 @@ const tabs:{id:Page;label:string}[]=[{id:'schema',label:'Схема и покр�
 const fmt=(v:string|null)=>v?new Date(v).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'}):'—';
 const emptyGraphTypes:GraphType[]=[];
 const duration=(run:Run)=>run.endedAt?`${Math.round((Date.parse(run.endedAt)-Date.parse(run.startedAt))/60000)} мин`:'—';
-function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,setServiceId]=useState(MOCK_SERVICE_ID),[runId,setRunId]=useState('reg13'),[snapshotId,setSnapshotId]=useState('customer-v2'),[page,setPage]=useState<Page>('schema'),[mode,setMode]=useState<'graph'|'table'>('graph'),[fieldFilter,setFieldFilter]=useState<CoverageFilter>('all'),[query,setQuery]=useState(''),[requestFilter,setRequestFilter]=useState<RequestFilter>('all'),[requestField,setRequestField]=useState(''),[requestOperation,setRequestOperation]=useState(''),[operationKind,setOperationKind]=useState('all'),[operationField,setOperationField]=useState(''),[operationErrors,setOperationErrors]=useState(false),[sort,setSort]=useState('date'),[detail,setDetail]=useState<{kind:'type'|'field'|'operation'|'request';id:string}|null>(null),[detailTab,setDetailTab]=useState('Информация'),[schemaHistory,setSchemaHistory]=useState<InvestigationHistory>(emptyHistory),[explorerRequest,setExplorerRequest]=useState(0),[message,setMessage]=useState('');const flow=useReactFlow();
+function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useRef(saved?.runId??null);const [store,setStore]=useState<Store>(loadStore),[serviceId,setServiceId]=useState(saved?.serviceId??MOCK_SERVICE_ID),[runId,setRunId]=useState(saved?.runId??(saved?'':'reg13')),[snapshotId,setSnapshotId]=useState(saved?.snapshotId??'customer-v2'),[page,setPage]=useState<Page>('schema'),[mode,setMode]=useState<'graph'|'table'>('graph'),[fieldFilter,setFieldFilter]=useState<CoverageFilter>('all'),[query,setQuery]=useState(''),[requestFilter,setRequestFilter]=useState<RequestFilter>('all'),[requestField,setRequestField]=useState(''),[requestOperation,setRequestOperation]=useState(''),[operationKind,setOperationKind]=useState('all'),[operationField,setOperationField]=useState(''),[operationErrors,setOperationErrors]=useState(false),[sort,setSort]=useState('date'),[detail,setDetail]=useState<{kind:'type'|'field'|'operation'|'request';id:string}|null>(null),[detailTab,setDetailTab]=useState('Информация'),[schemaHistory,setSchemaHistory]=useState<InvestigationHistory>(emptyHistory),[explorerRequest,setExplorerRequest]=useState(0),[message,setMessage]=useState('');const flow=useReactFlow();
  useEffect(()=>saveStore(store),[store]);
  const auth=useAuth();
  const {restore,session}=auth;
@@ -72,6 +77,48 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
  const apiRun=remoteService?selectedRun(apiRunSelection,serviceScope,schemaId):null;
  const [coverageVersion,setCoverageVersion]=useState(0);
  const runCoverage=useRunCoverage(apiRun?.id??null,schemaId,`${graphScope}:${coverageVersion}`,apiRun?.status);
+ const [restoreEnded,setRestoreEnded]=useState(false);
+ const restoreTarget=!mockSelected&&schemaId===saved?.snapshotId&&serviceId===saved?.serviceId?saved?.runId:null;
+ useEffect(()=>{
+  if(!restoreTarget||!schemaId||pendingRestore.current!==restoreTarget)return;
+  const controller=new AbortController();
+  void findRun(schemaId,restoreTarget,controller.signal).then(restored=>{
+   if(controller.signal.aborted||pendingRestore.current!==restoreTarget)return;
+   pendingRestore.current=null;
+   if(restored)setApiRunSelection({scope:serviceScope,run:restored});
+   setRestoreEnded(true);
+  },(error:Error)=>{
+   if(controller.signal.aborted||pendingRestore.current!==restoreTarget)return;
+   pendingRestore.current=null;
+   setMessage(analyticsError(error));
+   setRestoreEnded(true);
+  });
+  return ()=>controller.abort();
+ },[restoreTarget,schemaId,serviceScope]);
+ useEffect(()=>{
+  if(!mockSelected&&(!schemaId||pendingRestore.current&&!restoreEnded&&schemaId===saved?.snapshotId))return;
+  saveWorkspace({serviceId,snapshotId:schemaId,runId:mockSelected?run?.id??null:apiRun?.id??null});
+ },[mockSelected,serviceId,schemaId,run?.id,apiRun?.id,restoreEnded,saved?.snapshotId]);
+ const [analysisRevision,setAnalysisRevision]=useState(0);
+ const [backendNavigation,setBackendNavigation]=useState(0);
+ const [backendOperationKey,setBackendOperationKey]=useState('');
+ const analysisScope=apiRun?JSON.stringify([graphScope,apiRun.id,apiRun.status]):null;
+ const statsRunId=apiRun?.id??null;
+ const loadStats=useCallback((signal:AbortSignal)=>getRunStats(statsRunId!,signal),[statsRunId]);
+ const stats=useBackendRead(analysisScope?JSON.stringify([analysisScope,analysisRevision]):null,loadStats);
+ const refreshAnalytics=async()=>{
+  runCoverage.refresh();
+  setAnalysisRevision(value=>value+1);
+  if(!apiRun)return;
+  setHistoryVersion(value=>value+1);
+  try{
+   const updated=await findRun(apiRun.snapshotId,apiRun.id);
+   setApiRunSelection(previous=>previous?.scope===serviceScope&&previous.run===apiRun
+    ? updated?{scope:serviceScope,run:updated}:null : previous);
+  }catch(error){
+   if(error instanceof ApiError&&error.status===401&&auth.getCurrent().revision===auth.revision)void restore();
+  }
+ };
  const [finishRequest,setFinishRequest]=useState<RunSelection|null>(null);
  const finishTarget=remoteService?selectedRun(finishRequest,serviceScope,schemaId):null;
  const [historyVersion,setHistoryVersion]=useState(0);
@@ -97,7 +144,7 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
  const sdlMessage=remoteSdl.state.kind==='error'?remoteSdl.state.error.message:
   remoteSdl.state.kind==='loading'?'Загружаем SDL…':undefined;
  const schemaError=remoteList.kind==='error'?remoteList.error:remoteGraph.kind==='error'?remoteGraph.error:null;
- const readErrorStatus=runCoverage.error?.status??schemaError?.status??(remoteSdl.state.kind==='error'?remoteSdl.state.error.status:undefined);
+ const readErrorStatus=runCoverage.error?.status??(stats.error instanceof ApiError?stats.error.status:undefined)??schemaError?.status??(remoteSdl.state.kind==='error'?remoteSdl.state.error.status:undefined);
  useEffect(()=>{if(session&&readErrorStatus===401)void restore()},[session,readErrorStatus,restore]);
 
  const coverageNotice=runCoverage.loading
@@ -128,6 +175,7 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
  },[auth.revision,mockSelected,resetSchemaNavigation,resetSchemaFilters]);
  const selectService=(id:string,local:boolean)=>{
   if(id===serviceId)return;
+  pendingRestore.current=null;
   const firstRun=local?store.runs.find(item=>item.serviceId===id):undefined;
   const firstSnapshot=local?store.snapshots.find(item=>item.serviceId===id):undefined;
   setServiceId(id);
@@ -162,6 +210,21 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
    throw error;
   }
  };
+ const submitServiceEdit=async(id:string,input:ServiceUpdate)=>{
+  const current=auth.getCurrent();
+  if(current.pending||current.revision!==auth.revision||!canCreateService(current.session)){
+   throw new ApiError('http','Сессия недоступна.',401);
+  }
+  try{
+   const updated=await updateService(id,input,current.session.csrfToken);
+   if(auth.getCurrent().revision!==current.revision)return;
+   catalog.replaceService(updated);
+   setMessage('Настройки сервиса сохранены');
+  }catch(error){
+   if(error instanceof ApiError&&error.status===401)void restore();
+   throw error;
+  }
+ };
  const hadSession=useRef(Boolean(session));
  useEffect(()=>{
   const signedOut=hadSession.current&&!session;
@@ -181,6 +244,7 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
  const chooseRun=(id:string)=>{const next=mockRuns.find(r=>r.id===id);setRunId(id);if(next){setServiceId(next.serviceId);setSnapshotId(next.snapshotId);if(next.snapshotId!==snapshot?.id)resetSchemaNavigation()}else resetSchemaNavigation();setRequestFilter('all');setRequestField('');setRequestOperation('')};
  const chooseSnapshot=(id:string)=>{
   if(id===schemaId||!snapshots.some(item=>item.id===id))return;
+  pendingRestore.current=null;
   setSnapshotId(id);
   setApiRunSelection(null);
   setFinishRequest(null);
@@ -196,8 +260,8 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
  const openType=(t:string,edgeId:string|null=null)=>navigateSchema('type',t,edgeId);
  const travelSchema=(direction:-1|1)=>{const next=moveStep(updateStep(schemaHistory,{viewport:flow.getViewport()}),direction);if(next===schemaHistory||next.index===schemaHistory.index)return;setSchemaHistory(next);const step=currentStep(next)!;setDetail({kind:step.kind,id:step.id});setMode('graph');requestAnimationFrame(()=>requestAnimationFrame(()=>{void flow.setViewport(step.viewport,{duration:300})}))};
  const changeSchemaTab=(tab:'Обзор'|'Связи'|'SDL')=>setSchemaHistory(old=>updateStep(old,{tab}));
- const goOperations=(field:string)=>{setPage('operations');setOperationField(field);setOperationKind('all');setOperationErrors(false);setQuery('');setDetail(null)};
- const goRequests=(filter:RequestFilter='all',field='',operation='')=>{setPage('requests');setRequestFilter(filter);setRequestField(field);setRequestOperation(operation);setOperationKind('all');setSort('date');setQuery('');setDetail(null)};
+ const goOperations=(field:string)=>{setBackendNavigation(value=>value+1);setBackendOperationKey('');setPage('operations');setOperationField(field);setOperationKind('all');setOperationErrors(false);setQuery('');setDetail(null)};
+ const goRequests=(filter:RequestFilter='all',field='',operation='')=>{setBackendNavigation(value=>value+1);setPage('requests');setRequestFilter(filter);setRequestField(field);setRequestOperation(operation);setOperationKind('all');setSort('date');setQuery('');setDetail(null)};
  const summaryAction=(key:string)=>{if(key==='zero-types'){setPage('schema');setMode('graph');setExplorerRequest(value=>value+1);setDetail(null);return}if(key==='operations'){goOperations('');return}const target=summaryDestination(key);setDetail(null);setQuery('');if(target.page==='schema'){setPage('schema');setMode(target.mode as 'graph'|'table');setFieldFilter(target.filter as CoverageFilter)}else{goRequests(target.filter as RequestFilter);if('sort'in target&&target.sort)setSort(target.sort)}};
  const applyImportedSnapshot=(id:string)=>{
   setSnapshotId(id);
@@ -209,6 +273,20 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
   resetSchemaFilters();
   setPage('schema');
   setMode('graph');
+ };
+ const submitSnapshotName=async(displayName:string|null)=>{
+  const current=auth.getCurrent();
+  if(current.pending||current.revision!==auth.revision||!canCreateService(current.session)){
+   throw new ApiError('http','Сессия недоступна.',401);
+  }
+  if(!remote.selected)throw new ApiError('http','Снимок недоступен.',404);
+  try{
+   const updated=await renameSchema(remote.selected,displayName,current.session.csrfToken);
+   if(auth.getCurrent().revision===current.revision)remote.replaceSnapshot(updated);
+  }catch(error){
+   if(error instanceof ApiError&&error.status===401)void restore();
+   throw error;
+  }
  };
  const importSnapshot=async(input:SnapshotImport)=>{
   if(mockSelected){
@@ -241,11 +319,12 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
  };
  const createRun=()=>{if(!snapshot)return;const name=prompt('Название локального прогона');if(!name?.trim())return;const next:Run={id:crypto.randomUUID(),name:name.trim(),serviceId,snapshotId:snapshot.id,status:'active',startedAt:new Date().toISOString(),endedAt:null};setStore(s=>({...s,runs:[...s.runs,next]}));chooseRun(next.id);setRunId(next.id);setMessage('Локальный прогон создан')};
  const chooseApiRun=(next:RunOut)=>{
-  const target=snapshotForRun(next,remote.items);
-  if(!target||!remoteService)return;
-  if(schemaId!==target.id)chooseSnapshot(target.id);
-  if(apiRun?.id!==next.id)setCoverageVersion(version=>version+1);
-  setApiRunSelection({scope:serviceScope,run:next});
+  const selection=remoteService?runSelectionForHistory(next,serviceScope,remote.items):null;
+  if(!selection)return;
+  pendingRestore.current=null;
+  if(schemaId!==next.snapshotId)chooseSnapshot(next.snapshotId);
+  if(apiRun?.id!==next.id){setCoverageVersion(version=>version+1);setOperationField('');setRequestField('');setRequestOperation('');setRequestFilter('all');setBackendOperationKey('');}
+  setApiRunSelection(selection);
   setPage('schema');
   setMode('graph');
  };
@@ -363,12 +442,22 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
  const visibleRequests=requests.filter(r=>{const op=store.operations.find(o=>o.id===r.operationId);return (op?.name.toLowerCase().includes(query.toLowerCase())??false)&&(requestFilter==='all'||requestFilter==='http'&&r.httpStatus>=400||requestFilter==='graphql'&&r.graphqlErrors.length>0||requestFilter==='analyzer'&&!!r.analyzerError)&&(!requestField||r.hasData&&!r.analyzerError&&op?.fields.some(f=>fieldId(f.type,f.field)===requestField))&&(!requestOperation||r.operationId===requestOperation)&&(operationKind==='all'||op?.kind===operationKind)}).sort((a,b)=>sort==='duration'?b.durationMs-a.durationMs:b.at.localeCompare(a.at));
  const history=mockRuns.filter(r=>r.name.toLowerCase().includes(query.toLowerCase())&&(operationKind==='all'||r.status===operationKind)).sort((a,b)=>sort==='coverage'?(coverageFor(store.snapshots.find(s=>s.id===b.snapshotId)!,b,store).summary.coveragePercent-coverageFor(store.snapshots.find(s=>s.id===a.snapshotId)!,a,store).summary.coveragePercent):b.startedAt.localeCompare(a.startedAt));
  const selectedOp=detail?.kind==='operation'?store.operations.find(o=>o.id===detail.id):null;const selectedRequest=detail?.kind==='request'?store.observations.find(o=>o.id===detail.id):null;
- return <div className="analytics-app"><TopChrome intent={intent} onAction={requestAction} onCloseAction={closeAction} auth={auth} catalog={catalog} mockSelected={mockSelected} serviceId={serviceId} snapshots={snapshots} snapshot={selectedSnapshot} snapshotStatus={snapshotStatus} run={run} apiRun={apiRun} onCreateRun={submitApiRun} onFinishRun={()=>{if(apiRun?.status==='running')setFinishRequest({scope:serviceScope,run:apiRun})}} metrics={metrics} coverage={coverageSummary} schemaFieldCount={coverageSummary?.totalFields??snapshotGraph?.summary.totalFields??(snapshot?graphTypes.reduce((sum,type)=>sum+type.totalFields,0):null)} page={page} onService={chooseService} onCreateService={submitService} onSnapshot={chooseSnapshot} onImport={importSnapshot} onPage={next=>{setPage(next);setQuery('');setDetail(null);setOperationKind('all');setSort('date')}} onMetric={summaryAction}/>{message&&<div className="toast" role="status">{message}<button onClick={()=>setMessage('')}>×</button></div>}<main className={`analytics-main page-${page}`}><div className="view-heading"><div><h1>{tabs.find(t=>t.id===page)?.label}</h1></div></div><div className="view-body">{!mockSelected&&page==='history'&&remoteService
+ const realAnalytics=apiRun&&(page==='operations'||page==='requests')&&(()=>{
+  const Analytics=page==='operations'?BackendOperations:BackendRequests;
+  return <Analytics key={JSON.stringify([analysisScope,page,backendNavigation])} scope={analysisScope!} revision={analysisRevision}
+   runId={apiRun.id} role={session?.user.role} field={page==='operations'?operationField:requestField}
+   operationKey={page==='operations'?backendOperationKey:requestOperation} filter={requestFilter} sort={sort} types={graphTypes} stats={stats.data}
+   onField={(type,field)=>{setPage('schema');focusExplorer(type,field)}}
+   onRequests={key=>goRequests('all','',key)} onOperation={key=>{goOperations('');setBackendOperationKey(key)}}
+   onClearContext={()=>{if(page==='operations')setOperationField('');else {setRequestField('');setRequestOperation('')}}}
+   />;
+ })();
+ return <div className="analytics-app"><TopChrome intent={intent} onAction={requestAction} onCloseAction={closeAction} auth={auth} catalog={catalog} mockSelected={mockSelected} serviceId={serviceId} snapshots={snapshots} snapshot={selectedSnapshot} snapshotStatus={snapshotStatus} run={run} apiRun={apiRun} onCreateRun={submitApiRun} onFinishRun={()=>{if(apiRun?.status==='running')setFinishRequest({scope:serviceScope,run:apiRun})}} metrics={metrics} backendStats={stats.data} statsLoading={stats.loading} statsError={stats.error?analyticsError(stats.error):undefined} onRefresh={refreshAnalytics} coverage={coverageSummary} schemaFieldCount={coverageSummary?.totalFields??snapshotGraph?.summary.totalFields??(snapshot?graphTypes.reduce((sum,type)=>sum+type.totalFields,0):null)} page={page} onService={chooseService} onCreateService={submitService} onEditService={submitServiceEdit} onSnapshot={chooseSnapshot} onImport={importSnapshot} onRenameSnapshot={submitSnapshotName} snapshotDisplayName={remote.selected?.displayName} onPage={next=>{if(!mockSelected&&next==='operations'){goOperations('');return}if(!mockSelected&&next==='requests'){goRequests();return}setPage(next);setQuery('');setDetail(null);setOperationKind('all');setSort('date')}} onMetric={summaryAction}/>{message&&<div className="toast" role="status">{message}<button onClick={()=>setMessage('')}>×</button></div>}<main className={`analytics-main page-${page}`}><div className="view-heading"><div><h1>{tabs.find(t=>t.id===page)?.label}</h1></div></div><div className="view-body">{!mockSelected&&page==='history'&&remoteService
   ?<BackendRunHistory key={`${serviceScope}:${historyVersion}`} serviceId={remoteService.id} snapshots={snapshots}
     snapshotsReady={remoteList.kind!=='loading'} selectedId={apiRun?.id} onSelect={chooseApiRun}/>
-  :!mockSelected&&(page!=='schema'||!remoteGraphData)?<div className="content-panel">
+  :realAnalytics?realAnalytics:!mockSelected&&(page!=='schema'||!remoteGraphData)?<div className="content-panel">
   {page==='history'?<Empty text={catalog.state.kind==='error'?catalog.state.error.message:'Загружаем выбранный сервис…'}/>:
-   page!=='schema'?<Empty text="Аналитика прогонов API пока не подключена."/>:
+   page!=='schema'?<Empty text="Выберите прогон в истории, чтобы открыть аналитику."/>:
    <div className="empty-state" role={runCoverage.error||schemaError&&!runCoverage.loading?'alert':'status'}>
     <p>{!remoteService&&catalog.state.kind==='error'?catalog.state.error.message:remoteMessage}</p>
     {(runCoverage.error||schemaError&&!runCoverage.loading)&&<button type="button" onClick={runCoverage.error?runCoverage.refresh:remoteList.kind==='error'?remote.snapshots.retry:remote.graph.retry}>Повторить</button>}
@@ -393,7 +482,7 @@ function Inner(){const [store,setStore]=useState<Store>(loadStore),[serviceId,se
   onFilter={setFieldFilter}
   onSort={setSort}
   onField={openField}
- /> }</div></>:page==='operations'?<div className="content-panel"><div className="panel-tools"><input placeholder="Поиск операции" value={query} onChange={e=>setQuery(e.target.value)}/><select value={operationKind} onChange={e=>setOperationKind(e.target.value)}><option value="all">Все типы</option><option>Query</option><option>Mutation</option></select><label><input type="checkbox" checked={operationErrors} onChange={e=>setOperationErrors(e.target.checked)}/> С ошибками</label><select value={sort} onChange={e=>setSort(e.target.value)}><option value="date">По частоте</option><option value="duration">По времени</option><option value="errors">По ошибкам</option></select><button onClick={()=>{setQuery('');setOperationKind('all');setOperationErrors(false);setOperationField('')}}>Сбросить</button></div>{operationField&&<div className="active-filter">Поле: {operationField} <button onClick={()=>setOperationField('')}>×</button></div>}<div className="table-scroll"><table><thead><tr><th>Операция</th><th>Тип</th><th>Выполнений</th><th>HTTP</th><th>GraphQL</th><th>Среднее</th><th>Поля</th></tr></thead><tbody>{visibleOps.map(o=><tr key={o.id} onClick={()=>{setDetail({kind:'operation',id:o.id});setDetailTab('Информация')}}><td><b>{o.name}</b></td><td>{o.kind}</td><td>{o.count}</td><td>{o.httpErrors}</td><td>{o.graphqlErrors}</td><td>{o.averageMs} мс</td><td>{o.fields.length}</td></tr>)}</tbody></table>{!visibleOps.length&&<Empty text="Операции не найдены"/>}</div></div>:page==='requests'?<div className="content-panel"><div className="panel-tools"><input placeholder="Имя операции" value={query} onChange={e=>setQuery(e.target.value)}/><select value={operationKind} onChange={e=>setOperationKind(e.target.value)}><option value="all">Query и Mutation</option><option>Query</option><option>Mutation</option></select><select value={requestFilter} onChange={e=>setRequestFilter(e.target.value as RequestFilter)}><option value="all">Все статусы</option><option value="http">HTTP 4xx/5xx</option><option value="graphql">GraphQL-ошибки</option><option value="analyzer">Ошибки анализа</option></select><select value={requestField} onChange={e=>setRequestField(e.target.value)}><option value="">Все поля</option>{coverage?.types.flatMap(t=>t.fields.map(f=><option key={fieldId(t.name,f.name)} value={fieldId(t.name,f.name)}>{fieldId(t.name,f.name)}</option>))}</select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="date">Сначала новые</option><option value="duration">Долгие сначала</option></select><button onClick={()=>{setQuery('');setRequestFilter('all');setRequestField('');setRequestOperation('');setOperationKind('all')}}>Сбросить</button></div>{requestOperation&&<div className="active-filter">Структура операции: {store.operations.find(o=>o.id===requestOperation)?.name} <button onClick={()=>setRequestOperation('')}>×</button></div>}<div className="table-scroll"><table><thead><tr><th>Дата и время</th><th>Операция</th><th>Тип</th><th>HTTP</th><th>GraphQL</th><th>Длительность</th><th>Анализ</th></tr></thead><tbody>{visibleRequests.map(r=>{const op=store.operations.find(o=>o.id===r.operationId);return <tr key={r.id} onClick={()=>{setDetail({kind:'request',id:r.id});setDetailTab('Информация')}}><td>{fmt(r.at)}</td><td><b>{op?.name}</b></td><td>{op?.kind}</td><td><Status yes={r.httpStatus<400} label={String(r.httpStatus)}/></td><td>{r.graphqlErrors.length?'Есть':'—'}</td><td>{r.durationMs} мс</td><td>{r.analyzerError?'Ошибка':'Успешно'}</td></tr>})}</tbody></table>{!visibleRequests.length&&<Empty text="Обращения не найдены"/>}</div></div>:<div className="content-panel"><div className="panel-tools"><button onClick={createRun} disabled={!snapshot}>+ Новый прогон</button>{run?.status==='active'&&<button onClick={finishRun}>Завершить прогон</button>}<input placeholder="Поиск прогона" value={query} onChange={e=>setQuery(e.target.value)}/><select value={operationKind} onChange={e=>setOperationKind(e.target.value)}><option value="all">Все статусы</option><option value="active">Активные</option><option value="completed">Завершённые</option></select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="date">По дате</option><option value="coverage">По покрытию</option></select><button onClick={()=>{setQuery('');setOperationKind('all')}}>Сбросить</button></div><div className="table-scroll"><table><thead><tr><th>Прогон</th><th>Статус</th><th>Начало</th><th>Завершение</th><th>Длительность</th><th>Обращения</th><th>HTTP</th><th>GraphQL</th><th>Покрытие</th><th>Схема</th></tr></thead><tbody>{history.map(r=>{const snap=store.snapshots.find(s=>s.id===r.snapshotId)!;const m=metricsFor(requestsFor(store,r.id));const c=coverageFor(snap,r,store);return <tr key={r.id} className={r.id===runId?'selected':''} onClick={()=>{chooseRun(r.id);setPage('schema');setMode('graph')}}><td><b>{r.name}</b></td><td><span className={'run-state '+r.status}>{r.status==='active'?'Активен':'Завершён'}</span></td><td>{fmt(r.startedAt)}</td><td>{fmt(r.endedAt)}</td><td>{duration(r)}</td><td>{m.total}</td><td>{m.httpErrors}</td><td>{m.graphqlErrors}</td><td>{c.summary.coveragePercent.toFixed(2)}%</td><td>{snap.name}</td></tr>})}</tbody></table>{!history.length&&<Empty text="Прогоны не найдены"/>}</div></div>}{page==='schema'&&(detail?.kind==='type'||detail?.kind==='field')&&<SchemaDetailPanel showUsage={mockSelected} types={graphTypes} snapshot={detailSnapshot} sdlMessage={sdlMessage} operations={operations} requests={requests} history={schemaHistory} onBack={()=>travelSchema(-1)} onForward={()=>travelSchema(1)} onClose={()=>setDetail(null)} onTab={changeSchemaTab} onType={(name,edgeId)=>focusExplorer(name,undefined,edgeId)} onField={(type,field)=>focusExplorer(type,field)} onOperations={goOperations} onRequests={field=>goRequests('all',field)}/>}{detail&&(detail.kind==='operation'||detail.kind==='request')&&<aside className="detail-panel"><div className="detail-head"><strong>Подробности</strong><button onClick={()=>setDetail(null)} aria-label="Закрыть подробности">×</button></div>{detail.kind==='operation'&&selectedOp&&<><small>{selectedOp.kind}</small><h2>{selectedOp.name}</h2><div className="detail-tabs">{['Информация','GraphQL-код'].map(x=><button key={x} className={detailTab===x?'active':''} onClick={()=>setDetailTab(x)}>{x}</button>)}</div>{detailTab==='GraphQL-код'?<CodeView code={selectedOp.document}/>:<><p>Структура: <code>{selectedOp.id}</code></p><p>Выполнений: {operations.find(o=>o.id===selectedOp.id)?.count}</p><h3>Затронутые поля</h3>{selectedOp.fields.map(f=><button className="detail-list-row" key={fieldId(f.type,f.field)} onClick={()=>{setPage('schema');setMode('graph');openField(f.type,f.field)}}>{fieldId(f.type,f.field)}</button>)}<button className="primary" onClick={()=>goRequests('all','',selectedOp.id)}>Показать обращения</button></>}</>}{detail.kind==='request'&&selectedRequest&&<><small>ОБРАЩЕНИЕ · {selectedRequest.id}</small><h2>{store.operations.find(o=>o.id===selectedRequest.operationId)?.name}</h2><div className="detail-tabs">{['Информация','Поля','GraphQL-код','Ошибки'].map(x=><button key={x} className={detailTab===x?'active':''} onClick={()=>setDetailTab(x)}>{x}</button>)}</div>{detailTab==='Информация'?<dl><dt>Дата</dt><dd>{fmt(selectedRequest.at)}</dd><dt>HTTP</dt><dd>{selectedRequest.httpStatus}</dd><dt>GraphQL ошибки</dt><dd>{selectedRequest.graphqlErrors.length}</dd><dt>Длительность</dt><dd>{selectedRequest.durationMs} мс</dd><dt>Анализ</dt><dd>{selectedRequest.analyzerError??'Успешно'}</dd></dl>:detailTab==='Поля'?store.operations.find(o=>o.id===selectedRequest.operationId)?.fields.map(f=><button className="detail-list-row" key={fieldId(f.type,f.field)} onClick={()=>{setPage('schema');setMode('graph');openField(f.type,f.field)}}>{fieldId(f.type,f.field)} →</button>):detailTab==='GraphQL-код'?<CodeView code={selectedRequest.safeDocument}/>:<>{selectedRequest.analyzerError&&<p>{selectedRequest.analyzerError}</p>}{selectedRequest.graphqlErrors.map((e,i)=><p key={i}>{e.message} · {e.path} · {e.line}:{e.column}</p>)}{!selectedRequest.graphqlErrors.length&&!selectedRequest.analyzerError&&<Empty text="Ошибок нет"/>}</>}</>}</aside>}</div></main>{finishTarget&&<FinishRunDialog key={finishTarget.id} run={finishTarget} onFinish={completeApiRun} onClose={()=>setFinishRequest(null)}/>}</div>}
+ /> }</div></>:page==='operations'?<div className="content-panel"><div className="panel-tools"><input placeholder="Поиск операции" value={query} onChange={e=>setQuery(e.target.value)}/><select value={operationKind} onChange={e=>setOperationKind(e.target.value)}><option value="all">Все типы</option><option>Query</option><option>Mutation</option></select><label><input type="checkbox" checked={operationErrors} onChange={e=>setOperationErrors(e.target.checked)}/> С ошибками</label><select value={sort} onChange={e=>setSort(e.target.value)}><option value="date">По частоте</option><option value="duration">По времени</option><option value="errors">По ошибкам</option></select><button onClick={()=>{setQuery('');setOperationKind('all');setOperationErrors(false);setOperationField('')}}>Сбросить</button></div>{operationField&&<div className="active-filter">Поле: {operationField} <button onClick={()=>setOperationField('')}>×</button></div>}<div className="table-scroll"><table><thead><tr><th>Операция</th><th>Тип</th><th>Выполнений</th><th>HTTP</th><th>GraphQL</th><th>Среднее</th><th>Поля</th></tr></thead><tbody>{visibleOps.map(o=><tr key={o.id} onClick={()=>{setDetail({kind:'operation',id:o.id});setDetailTab('Информация')}}><td><b>{o.name}</b></td><td>{o.kind}</td><td>{o.count}</td><td>{o.httpErrors}</td><td>{o.graphqlErrors}</td><td>{o.averageMs} мс</td><td>{o.fields.length}</td></tr>)}</tbody></table>{!visibleOps.length&&<Empty text="Операции не найдены"/>}</div></div>:page==='requests'?<div className="content-panel"><div className="panel-tools"><input placeholder="Имя операции" value={query} onChange={e=>setQuery(e.target.value)}/><select value={operationKind} onChange={e=>setOperationKind(e.target.value)}><option value="all">Query и Mutation</option><option>Query</option><option>Mutation</option></select><select value={requestFilter} onChange={e=>setRequestFilter(e.target.value as RequestFilter)}><option value="all">Все статусы</option><option value="http">HTTP 4xx/5xx</option><option value="graphql">GraphQL-ошибки</option><option value="analyzer">Ошибки анализа</option></select><select value={requestField} onChange={e=>setRequestField(e.target.value)}><option value="">Все поля</option>{coverage?.types.flatMap(t=>t.fields.map(f=><option key={fieldId(t.name,f.name)} value={fieldId(t.name,f.name)}>{fieldId(t.name,f.name)}</option>))}</select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="date">Сначала новые</option><option value="duration">Долгие сначала</option></select><button onClick={()=>{setQuery('');setRequestFilter('all');setRequestField('');setRequestOperation('');setOperationKind('all')}}>Сбросить</button></div>{requestOperation&&<div className="active-filter">Структура операции: {store.operations.find(o=>o.id===requestOperation)?.name} <button onClick={()=>setRequestOperation('')}>×</button></div>}<div className="table-scroll"><table><thead><tr><th>Дата и время</th><th>Операция</th><th>Тип</th><th>HTTP</th><th>GraphQL</th><th>Длительность</th><th>Анализ</th></tr></thead><tbody>{visibleRequests.map(r=>{const op=store.operations.find(o=>o.id===r.operationId);return <tr key={r.id} onClick={()=>{setDetail({kind:'request',id:r.id});setDetailTab('Информация')}}><td>{fmt(r.at)}</td><td><b>{op?.name}</b></td><td>{op?.kind}</td><td><Status yes={r.httpStatus<400} label={String(r.httpStatus)}/></td><td>{r.graphqlErrors.length?'Есть':'—'}</td><td>{r.durationMs} мс</td><td>{r.analyzerError?'Ошибка':'Успешно'}</td></tr>})}</tbody></table>{!visibleRequests.length&&<Empty text="Обращения не найдены"/>}</div></div>:<div className="content-panel"><div className="panel-tools"><button onClick={createRun} disabled={!snapshot}>+ Новый прогон</button>{run?.status==='active'&&<button onClick={finishRun}>Завершить прогон</button>}<input placeholder="Поиск прогона" value={query} onChange={e=>setQuery(e.target.value)}/><select value={operationKind} onChange={e=>setOperationKind(e.target.value)}><option value="all">Все статусы</option><option value="active">Активные</option><option value="completed">Завершённые</option></select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="date">По дате</option><option value="coverage">По покрытию</option></select><button onClick={()=>{setQuery('');setOperationKind('all')}}>Сбросить</button></div><div className="table-scroll"><table><thead><tr><th>Прогон</th><th>Статус</th><th>Начало</th><th>Завершение</th><th>Длительность</th><th>Обращения</th><th>HTTP</th><th>GraphQL</th><th>Покрытие</th><th>Схема</th></tr></thead><tbody>{history.map(r=>{const snap=store.snapshots.find(s=>s.id===r.snapshotId)!;const m=metricsFor(requestsFor(store,r.id));const c=coverageFor(snap,r,store);return <tr key={r.id} className={r.id===runId?'selected':''} onClick={()=>{chooseRun(r.id);setPage('schema');setMode('graph')}}><td><b>{r.name}</b></td><td><span className={'run-state '+r.status}>{r.status==='active'?'Активен':'Завершён'}</span></td><td>{fmt(r.startedAt)}</td><td>{fmt(r.endedAt)}</td><td>{duration(r)}</td><td>{m.total}</td><td>{m.httpErrors}</td><td>{m.graphqlErrors}</td><td>{c.summary.coveragePercent.toFixed(2)}%</td><td>{snap.name}</td></tr>})}</tbody></table>{!history.length&&<Empty text="Прогоны не найдены"/>}</div></div>}{page==='schema'&&(detail?.kind==='type'||detail?.kind==='field')&&<SchemaDetailPanel showUsage={mockSelected} showAnalyticsLinks={Boolean(apiRun)} canOpenRequests={mayReadJournal(session?.user.role)} types={graphTypes} snapshot={detailSnapshot} sdlMessage={sdlMessage} operations={operations} requests={requests} history={schemaHistory} onBack={()=>travelSchema(-1)} onForward={()=>travelSchema(1)} onClose={()=>setDetail(null)} onTab={changeSchemaTab} onType={(name,edgeId)=>focusExplorer(name,undefined,edgeId)} onField={(type,field)=>focusExplorer(type,field)} onOperations={goOperations} onRequests={field=>goRequests('all',field)}/>}{detail&&(detail.kind==='operation'||detail.kind==='request')&&<aside className="detail-panel"><div className="detail-head"><strong>Подробности</strong><button onClick={()=>setDetail(null)} aria-label="Закрыть подробности">×</button></div>{detail.kind==='operation'&&selectedOp&&<><small>{selectedOp.kind}</small><h2>{selectedOp.name}</h2><div className="detail-tabs">{['Информация','GraphQL-код'].map(x=><button key={x} className={detailTab===x?'active':''} onClick={()=>setDetailTab(x)}>{x}</button>)}</div>{detailTab==='GraphQL-код'?<CodeView code={selectedOp.document}/>:<><p>Структура: <code>{selectedOp.id}</code></p><p>Выполнений: {operations.find(o=>o.id===selectedOp.id)?.count}</p><h3>Затронутые поля</h3>{selectedOp.fields.map(f=><button className="detail-list-row" key={fieldId(f.type,f.field)} onClick={()=>{setPage('schema');setMode('graph');openField(f.type,f.field)}}>{fieldId(f.type,f.field)}</button>)}<button className="primary" onClick={()=>goRequests('all','',selectedOp.id)}>Показать обращения</button></>}</>}{detail.kind==='request'&&selectedRequest&&<><small>ОБРАЩЕНИЕ · {selectedRequest.id}</small><h2>{store.operations.find(o=>o.id===selectedRequest.operationId)?.name}</h2><div className="detail-tabs">{['Информация','Поля','GraphQL-код','Ошибки'].map(x=><button key={x} className={detailTab===x?'active':''} onClick={()=>setDetailTab(x)}>{x}</button>)}</div>{detailTab==='Информация'?<dl><dt>Дата</dt><dd>{fmt(selectedRequest.at)}</dd><dt>HTTP</dt><dd>{selectedRequest.httpStatus}</dd><dt>GraphQL ошибки</dt><dd>{selectedRequest.graphqlErrors.length}</dd><dt>Длительность</dt><dd>{selectedRequest.durationMs} мс</dd><dt>Анализ</dt><dd>{selectedRequest.analyzerError??'Успешно'}</dd></dl>:detailTab==='Поля'?store.operations.find(o=>o.id===selectedRequest.operationId)?.fields.map(f=><button className="detail-list-row" key={fieldId(f.type,f.field)} onClick={()=>{setPage('schema');setMode('graph');openField(f.type,f.field)}}>{fieldId(f.type,f.field)} →</button>):detailTab==='GraphQL-код'?<CodeView code={selectedRequest.safeDocument}/>:<>{selectedRequest.analyzerError&&<p>{selectedRequest.analyzerError}</p>}{selectedRequest.graphqlErrors.map((e,i)=><p key={i}>{e.message} · {e.path} · {e.line}:{e.column}</p>)}{!selectedRequest.graphqlErrors.length&&!selectedRequest.analyzerError&&<Empty text="Ошибок нет"/>}</>}</>}</aside>}</div></main>{finishTarget&&<FinishRunDialog key={finishTarget.id} run={finishTarget} onFinish={completeApiRun} onClose={()=>setFinishRequest(null)}/>}</div>}
 function Status({yes,label}:{yes:boolean;label?:string}){return <span className={`status ${yes?'ok':'bad'}`}>{label??(yes?'Покрыто':'Не покрыто')}</span>}
 function Empty({text}:{text:string}){return <div className="empty-state">{text}</div>}
 export default function AnalyticsApp(){return <ReactFlowProvider><Inner/></ReactFlowProvider>}
