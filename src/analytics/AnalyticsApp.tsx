@@ -43,6 +43,7 @@ import './workspaceDark.css';
 import './profileAdmin.css';
 type Page='schema'|'operations'|'requests'|'history';
 type RequestFilter='all'|'http'|'graphql'|'analyzer';
+const emptyGraphTypes:GraphType[]=[];
 function Inner(){
  const [saved]=useState(readWorkspace);
  const pendingRestore=useRef(saved?.runId??null);
