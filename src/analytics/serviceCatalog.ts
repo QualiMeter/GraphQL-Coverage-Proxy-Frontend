@@ -1,22 +1,20 @@
 import {useEffect, useMemo, useState} from 'react';
 import {listServices, type ServiceOut} from '../api/services';
 import {ApiError} from '../api/client';
-import type {Service} from './model';
-import {isMockService} from './mockService';
 
 export type CatalogService = {
   id: string;
   name: string;
   endpointUrl: string | null;
-  source: 'mock' | 'backend';
+  source: 'backend';
 };
 
-export function combineServices(localServices: readonly Service[], remoteServices: readonly ServiceOut[]): CatalogService[] {
-  const mock = localServices.find(service => isMockService(service.id));
-  return [
-    ...(mock ? [{id: mock.id, name: mock.name, endpointUrl: mock.endpointUrl, source: 'mock' as const}] : []),
-    ...remoteServices.map(({id, name, endpointUrl}) => ({id, name, endpointUrl: endpointUrl ?? null, source: 'backend' as const})),
-  ];
+export function combineServices(remoteServices: readonly ServiceOut[]): CatalogService[] {
+ return remoteServices.map(({id,name,endpointUrl})=>({id,name,endpointUrl:endpointUrl??null,source:'backend'}));
+}
+
+export function availableServiceId(id:string,services:readonly CatalogService[]):string {
+ return services.some(service=>service.id===id)?id:services[0]?.id??'';
 }
 
 type CatalogState =
@@ -26,7 +24,7 @@ type CatalogState =
 
 const loading: CatalogState = {kind: 'loading'};
 
-export function useServiceCatalog(localServices: Service[], sessionRevision: number | null) {
+export function useServiceCatalog(sessionRevision: number | null) {
   const [result, setResult] = useState<{sessionRevision: number; attempt: number; state: CatalogState}>();
   const [created, setCreated] = useState<{revision: number; attempt: number; service: ServiceOut}>();
   const [attempt, setAttempt] = useState(0);
@@ -50,8 +48,8 @@ export function useServiceCatalog(localServices: Service[], sessionRevision: num
   const state = result?.sessionRevision === sessionRevision && result?.attempt === attempt ? result.state : loading;
   const confirmed = created?.revision === sessionRevision ? created.service : undefined;
   const services = useMemo(
-    () => combineServices(localServices, state.kind === 'ready' ? state.services : confirmed ? [confirmed] : []),
-    [localServices, state, confirmed],
+    () => combineServices(state.kind === 'ready' ? state.services : confirmed ? [confirmed] : []),
+    [state, confirmed],
   );
   const retry = () => setAttempt(value => value + 1);
   function refreshAfterCreate(service: ServiceOut) {

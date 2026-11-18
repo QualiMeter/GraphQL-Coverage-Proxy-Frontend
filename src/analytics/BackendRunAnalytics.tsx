@@ -5,8 +5,13 @@ import {useBackendRead} from './useBackendRead';
 import {analyticsError, analysisErrors, matchesOperation, mayReadJournal, millis, operationLabel} from './runAnalyticsModel';
 import {CodeView} from './CodeView';
 import {OperationsTable} from './OperationsTable';
+import type {SchemaCoordinate} from '../api/runPaths';
+import {useRequestPathSearch} from './useRequestPathSearch';
+import {RequestPathContext} from './RequestPathContext';
+import './requestPaths.css';
 
 type Props = {
+  snapshotId?:string;requestPath?:readonly SchemaCoordinate[];onClearPath?:()=>void;
   runId: string; scope: string; revision: number; role?: string;
   field: string; operationKey: string; filter: string; sort: string; types: GraphType[]; stats?: RunStats;
   onField: (type: string, field: string) => void;
@@ -94,6 +99,8 @@ export function BackendRequests(p:Props) {
   const [offset,setOffset]=useState(0);
   const [selection,setSelection]=useState('');
   const allowed=mayReadJournal(p.role);
+  const pathActive=Boolean(p.requestPath?.length);
+  const pathSearch=useRequestPathSearch({runId:p.runId,snapshotId:p.snapshotId,scope:p.scope,path:p.requestPath,enabled:allowed&&pathActive});
   const [typeName,fieldName]=field.split('.');
   const query=useMemo<JournalQuery>(()=>({operationName:name, operationKey:p.operationKey||undefined, operationType:kind||undefined,
     typeName:typeName||undefined,fieldName:fieldName||undefined,sortOrder:direction,
@@ -104,16 +111,20 @@ export function BackendRequests(p:Props) {
   const load=useCallback((signal:AbortSignal)=>getFilteredJournal(p.runId,query,offset,group,signal),[p.runId,query,offset,group]);
   const validInterval=!from||!to||from<to;
   const validHttpCode=!httpCode||/^[1-5]\d{2}$/.test(httpCode);
-  const result=useBackendRead(allowed&&validInterval&&validHttpCode?JSON.stringify([p.scope,p.revision,query,offset,group]):null,load);
-  const loadDetail=useCallback((signal:AbortSignal)=>getRequestDetail(p.runId,selection,signal),[p.runId,selection]);
+  const result=useBackendRead(allowed&&!pathActive&&validInterval&&validHttpCode?JSON.stringify([p.scope,p.revision,query,offset,group]):null,load);
+  const cachedDetail=pathActive?pathSearch.getDetail(selection):undefined;
+  const loadDetail=useCallback((signal:AbortSignal)=>cachedDetail?Promise.resolve(cachedDetail):getRequestDetail(p.runId,selection,signal),[p.runId,selection,cachedDetail]);
   const details=useBackendRead(allowed&&selection?JSON.stringify([p.scope,p.revision,selection]):null,loadDetail);
   const change=(action:()=>void)=>{action();setOffset(0);setSelection('')};
   const request=details.data;
+  const rows=pathActive?pathSearch.state?.rows:result.data?.rows;
+  const tableState=pathActive?{loading:!pathSearch.state||pathSearch.state.running,error:pathSearch.state?.error}:result;
   return <>
     <div className="content-panel">
       {p.stats&&<Stats stats={p.stats}/>}
       {!allowed?<div className="empty-state">{p.role?'Для журнала нужна роль аналитика, оператора или администратора и доступ к сервису.':'Войдите в систему, чтобы открыть журнал обращений.'}</div>:<>
-        <form className="panel-tools" onSubmit={e=>{e.preventDefault();change(()=>setName(search||undefined))}}>
+        {pathActive&&<RequestPathContext path={p.requestPath!} state={pathSearch.state} onContinue={pathSearch.next} onCancel={pathSearch.cancel} onClear={()=>change(()=>p.onClearPath?.())} onSelect={setSelection}/>}
+        <fieldset className="path-journal-filters" disabled={pathActive}><form className="panel-tools" onSubmit={e=>{e.preventDefault();change(()=>setName(search||undefined))}}>
           <input aria-label="Точное имя операции" placeholder="Точное имя операции" value={search} onChange={e=>setSearch(e.target.value)}/>
           <button type="submit">Найти</button>
           <KindSelect value={kind} onChange={value=>change(()=>setKind(value))}/>
@@ -132,15 +143,15 @@ export function BackendRequests(p:Props) {
           <label>С <input type="datetime-local" aria-label="Начало интервала" max={to||undefined} value={from} onChange={e=>change(()=>setFrom(e.target.value))}/></label>
           <label>По <input type="datetime-local" aria-label="Конец интервала" min={from||undefined} value={to} onChange={e=>change(()=>setTo(e.target.value))}/></label>
           <button type="button" onClick={()=>change(()=>{setSearch('');setName(undefined);setKind('');setFilter('all');setOrder('createdAt');setField('');setDirection('desc');setFrom('');setTo('');setHttpCode('');p.onClearContext()})}>Сбросить</button>
-        </form>
+        </form></fieldset>
         {p.operationKey&&<div className="active-filter">Выбрана структура операции <button onClick={p.onClearContext} aria-label="Убрать фильтр операции">×</button></div>}
-        {result.data?.rows.length?<div className="table-scroll"><table aria-label="Обращения прогона">
+        {rows?.length?<div className="table-scroll"><table aria-label="Обращения прогона">
           <thead><tr><th>Дата и время</th><th>Операция</th><th>Тип</th><th>HTTP</th><th>GraphQL</th><th>Длительность</th><th>Анализ</th></tr></thead>
-          <tbody>{result.data.rows.map(row=><tr key={row.id} className={selection===row.id?'selected':undefined} onClick={()=>setSelection(row.id)}>
+          <tbody>{rows.map(row=><tr key={row.id} className={selection===row.id?'selected':undefined} onClick={()=>setSelection(row.id)}>
             <td>{date(row.createdAt)}</td><td><button className="run-history-select" onClick={()=>setSelection(row.id)}>{operationLabel(row.operationName)}</button></td><td>{row.operationType??'—'}</td><td>{row.httpStatus??'—'}</td><td>{yesNo(row.graphqlHasErrors)}</td><td>{millis(row.durationMs)}</td><td>{analysisLabels[row.analysisStatus]??row.analysisStatus}</td>
           </tr>)}</tbody>
-        </table></div>:<Result {...result} empty={!validInterval?'Начало интервала должно быть раньше окончания.':!validHttpCode?'Введите HTTP-код от 100 до 599.':'Обращения не найдены.'}/>}
-        {(offset>0||result.data?.more)&&<div className="panel-tools"><button disabled={offset===0||result.loading} onClick={()=>{setOffset(offset-journalPageSize);setSelection('')}}>Назад</button>
+        </table></div>:<Result {...tableState} empty={pathActive?'В просмотренных документах пока нет подтверждённых совпадений.':!validInterval?'Начало интервала должно быть раньше окончания.':!validHttpCode?'Введите HTTP-код от 100 до 599.':'Обращения не найдены.'}/>}
+        {!pathActive&&(offset>0||result.data?.more)&&<div className="panel-tools"><button disabled={offset===0||result.loading} onClick={()=>{setOffset(offset-journalPageSize);setSelection('')}}>Назад</button>
           <span>Страница {offset/journalPageSize+1}</span><button disabled={!result.data?.more} onClick={()=>{setOffset(offset+journalPageSize);setSelection('')}}>Далее</button></div>}
       </>}
     </div>

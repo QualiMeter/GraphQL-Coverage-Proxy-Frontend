@@ -1,0 +1,12 @@
+import {pathLabel,type SchemaCoordinate} from '../api/runPaths';
+import type {PathSearchState} from './pathSearchSession';
+import {analyticsError} from './runAnalyticsModel';
+export function RequestPathContext({path,state,onContinue,onCancel,onClear,onSelect}:{path:readonly SchemaCoordinate[];state?:PathSearchState;onContinue:()=>void;onCancel:()=>void;onClear:()=>void;onSelect:(id:string)=>void}){
+ return <section className="request-path-context" aria-label="Поиск обращений по пути"><strong>Путь: {pathLabel(path)}</strong><div className="request-path-progress"><span>Просмотрено: {state?.viewed??0}</span><span>Подтверждено: {state?.rows.length??0}</span><span>Невозможно проверить: {state?.unverified.length??0}</span><span>Без совпадения: {state?.notMatched??0}</span><span>Ещё не проверено: {state?.remaining??'число неизвестно'}</span></div>
+  {(!state||state.running)&&<p role="status">Поиск выполняется…</p>}{state?.paused&&<p role="status">Поиск приостановлен. Уже полученные результаты сохранены.</p>}{state?.schemaIssue&&<p>{state.schemaIssue}</p>}{state?.error&&<p role="alert">{analyticsError(state.error)}</p>}
+  {state&&!state.running&&!state.more&&<p>Доступные страницы кандидатов просмотрены. Непроверенные документы остаются неизвестными; найденное число не обязано совпадать с pathHits.</p>}
+  <div className="request-path-actions">{state?.running?<button type="button" onClick={onCancel}>Отменить поиск</button>:state?.more&&<button type="button" onClick={onContinue}>{state.error?'Повторить поиск':'Продолжить поиск'}</button>}<button type="button" onClick={onClear}>Сбросить путь</button></div>
+  <details><summary>Как выполняется поиск</summary><p>Проверяется наличие цепочки в сохранённом документе, а не фактическое выполнение resolver. Обычные фильтры временно приостановлены.</p><p>Журнал может пополняться во время поиска. Результаты относятся к просмотренным страницам, а не к зафиксированному снимку журнала. Число оставшихся кандидатов — оценка по последнему ответу сервера.</p></details>
+  {Boolean(state?.unverified.length)&&<details><summary>Непроверенные обращения ({state!.unverified.length})</summary><ul>{state!.unverified.map(({row,reason})=><li key={row.id}><button type="button" onClick={()=>onSelect(row.id)}>{row.operationName??'Без имени'} · {new Date(row.createdAt).toLocaleString('ru-RU')}</button><small>{reason}</small></li>)}</ul></details>}
+ </section>;
+}

@@ -9,9 +9,10 @@ type Props = {
   snapshotsReady: boolean;
   selectedId?: string;
   onSelect: (run: RunOut) => void;
+  onCompare: () => void;
 };
 
-export function BackendRunHistory({serviceId, snapshots, snapshotsReady, selectedId, onSelect}: Props) {
+export function BackendRunHistory({serviceId, snapshots, snapshotsReady, selectedId, onSelect, onCompare}: Props) {
   const [offset, setOffset] = useState(0);
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{offset: number; attempt: number; page?: RunPage; error?: string}>();
@@ -30,6 +31,7 @@ export function BackendRunHistory({serviceId, snapshots, snapshotsReady, selecte
     <div className="content-panel backend-run-history">
       <div className="run-history-toolbar">
         <h2>Прогоны сервиса</h2>
+        <button type="button" className="run-control" onClick={onCompare}>Сравнить прогоны</button>
         <button type="button" className="run-control" disabled={!current} onClick={() => setAttempt(value => value + 1)}>
           {current?.error ? 'Повторить' : 'Обновить'}
         </button>

@@ -1,6 +1,5 @@
 import {Kind,parse,print} from 'graphql';
 import {relationId, type GraphType} from '../model';
-import type {Snapshot} from './model';
 
 export type Relation={id:string;source:string;field:string;target:string;covered?:boolean};
 export type NestedRelation={first:Relation;second:Relation};
@@ -34,7 +33,7 @@ export function nestedRelations(typeName:string,relations:Relation[]):NestedRela
  }
  return result;
 }
-export function sdlMetadata(snapshot:Pick<Snapshot,'sdl'>|null,typeName:string,fieldName?:string){
+export function sdlMetadata(snapshot:{sdl:string}|null,typeName:string,fieldName?:string){
  if(!snapshot?.sdl)return {definition:null,description:null,args:[] as string[],deprecationReason:null};
  try{
   const doc=parse(snapshot.sdl);

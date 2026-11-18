@@ -4,7 +4,6 @@ import {readSchemaFile, schemaImportError, validateSchemaSdl, type SnapshotImpor
 import './snapshotImport.css';
 
 type Props = {
-  local: boolean;
   service: CatalogService | null;
   onClose: () => void;
   onImport: (input: SnapshotImport) => Promise<void>;
@@ -20,7 +19,7 @@ const methods = [
   {id: 'introspection', label: 'Introspection'},
 ] as const;
 
-export function SnapshotDialog({local, service, onClose, onImport}: Props) {
+export function SnapshotDialog({service, onClose, onImport}: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const validation = useRef(0);
@@ -30,7 +29,7 @@ export function SnapshotDialog({local, service, onClose, onImport}: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const isSdl = method === 'sdl';
-  const canSubmit = isSdl ? selection?.kind === 'ready' : !local;
+  const canSubmit = isSdl ? selection?.kind === 'ready' : true;
 
   useEffect(() => {
     if (!dialog.current?.open) dialog.current?.showModal();
@@ -129,7 +128,7 @@ export function SnapshotDialog({local, service, onClose, onImport}: Props) {
                 <circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/>
               </svg>
             </span>
-            <p>{local ? 'Для mock-сервиса доступен импорт SDL-файла.' : 'Схема будет автоматически загружена из GraphQL API выбранного сервиса.'}</p>
+            <p>{'Схема будет автоматически загружена из GraphQL API выбранного сервиса.'}</p>
           </div>
         )}
 

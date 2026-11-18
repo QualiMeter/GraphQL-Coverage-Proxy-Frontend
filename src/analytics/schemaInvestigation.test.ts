@@ -1,24 +1,22 @@
 import {describe,expect,it} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {createElement} from 'react';
-import {coverageFor,operationsFor,requestsFor} from './model';
-import {initialStore} from './fixtures';
+import {coverageFor} from '../testSupport/model';
+import {initialStore} from '../testSupport/fixtures';
 import {SchemaDetailPanel} from './SchemaDetailPanel';
 import {currentStep,emptyHistory,moveStep,nestedRelations,pushStep,relationsFor,sdlMetadata,updateStep,type InvestigationHistory,type InvestigationStep} from './schemaInvestigation';
-import {snapshotFromSDL} from './sdl';
+import {snapshotFromSDL} from '../testSupport/sdl';
 
 const snapshot=initialStore.snapshots.find(item=>item.id==='customer-v2')!;
 const run=initialStore.runs.find(item=>item.id==='reg13')!;
 const types=coverageFor(snapshot,run,initialStore).types;
-const operations=operationsFor(initialStore,snapshot,requestsFor(initialStore,run.id));
-const requests=requestsFor(initialStore,run.id);
 const viewport={x:12,y:24,zoom:.8};
 const step=(id:string,kind:'type'|'field'='type',edgeId:string|null=null):InvestigationStep=>({id,kind,edgeId,tab:'Обзор',viewport});
 const history=(...entries:InvestigationStep[]):InvestigationHistory=>({entries,index:entries.length-1});
-const render=(entry:InvestigationStep)=>renderToStaticMarkup(createElement(SchemaDetailPanel,{types,snapshot,operations,requests,history:history(entry),onBack:()=>{},onForward:()=>{},onClose:()=>{},onTab:()=>{},onType:()=>{},onField:()=>{},onOperations:()=>{},onRequests:()=>{}}));
+const render=(entry:InvestigationStep)=>renderToStaticMarkup(createElement(SchemaDetailPanel,{types,snapshot,showAnalyticsLinks:true,canOpenRequests:true,history:history(entry),onBack:()=>{},onForward:()=>{},onClose:()=>{},onTab:()=>{},onType:()=>{},onField:()=>{},onOperations:()=>{},onRequests:()=>{}}));
 
 describe('GraphQL schema investigation',()=>{
- it('shows selected type fields, coverage and current run usage',()=>{const html=render(step('Customer'));expect(html).toContain('Customer');expect(html).toContain('Покрытие');expect(html).toContain('Обращений с данными');expect(html).toContain('orders');expect(html).toContain('hits')});
+ it('shows selected type fields, coverage and current run usage',()=>{const html=render(step('Customer'));expect(html).toContain('Customer');expect(html).toContain('Покрытие');expect(html).toContain('orders');expect(html).toContain('hits')});
  it('shows exact field details, SDL arguments and observed use',()=>{const html=render(step('Query.customer','field'));expect(html).toContain('Query.customer');expect(html).toContain('Customer');expect(html).toContain('id: ID!');expect(html).toContain('Показать операции');expect(html).toContain('Показать обращения')});
  it('derives incoming and outgoing relations from current snapshot',()=>{const relations=relationsFor(types);expect(relations).toContainEqual({id:'Customer.orders->Order',source:'Customer',field:'orders',target:'Order'});expect(relations).toContainEqual({id:'Query.customer->Customer',source:'Query',field:'customer',target:'Customer'});const html=render({...step('Customer'),tab:'Связи'});expect(html).toContain('Customer.orders → Order');expect(html).toContain('Query.customer → Customer')});
  it('limits nested dependencies to two transitions and ignores immediate cycles',()=>{const nested=nestedRelations('Customer',relationsFor(types));expect(nested).toContainEqual({first:{id:'Customer.orders->Order',source:'Customer',field:'orders',target:'Order'},second:{id:'Order.items->OrderItem',source:'Order',field:'items',target:'OrderItem'}});expect(nested.some(path=>path.second.target==='Customer')).toBe(false);expect(nested.some(path=>path.second.target==='Product')).toBe(false)});

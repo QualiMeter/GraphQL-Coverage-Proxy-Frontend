@@ -29,7 +29,7 @@ function decodeRun(data: unknown): RunOut {
 }
 
 export function listRuns(scope: RunScope, offset = 0, signal?: AbortSignal,
-  {status, limit = runPageSize}: {status?: 'running'; limit?: number} = {}) {
+  {status, limit = runPageSize}: {status?: 'running' | 'completed'; limit?: number} = {}) {
   const params = new URLSearchParams({limit: String(limit), offset: String(offset)});
   if (status) params.set('status', status);
   if (scope.snapshotId !== undefined) params.set('snapshotId', scope.snapshotId);
