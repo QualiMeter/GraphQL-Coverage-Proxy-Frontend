@@ -432,47 +432,106 @@ function Inner(){
    onClearContext={()=>{if(page==='operations')setOperationField('');else {setRequestField('');setRequestOperation('')}}}
    />;
  })();
- return <div className="analytics-app"><TopChrome adminOpen={adminOpen} onAdmin={()=>setAdminRevision(auth.revision)} canFinish={canFinishRun} coverageRefreshing={runCoverage.loading} contextRefreshing={!apiRun&&(remote.graph.refreshing||remote.snapshots.refreshing)} intent={intent} onAction={requestAction} onCloseAction={closeAction} auth={auth} catalog={catalog} mockSelected={mockSelected} serviceId={serviceId} snapshots={snapshots} snapshot={selectedSnapshot} snapshotStatus={snapshotStatus} run={run} apiRun={apiRun} onCreateRun={submitApiRun} onFinishRun={()=>{if(mockSelected){finishRun();return}if(apiRun?.status==='running')setFinishRequest({scope:serviceScope,run:apiRun})}} metrics={metrics} backendStats={stats.data} statsLoading={stats.loading} summaryErrors={summaryErrors} onRefresh={refreshContext} onRefreshSummary={refreshRunAnalytics} coverage={coverageSummary} schemaFieldCount={coverageSummary?.totalFields??snapshotGraph?.summary.totalFields??(snapshot?graphTypes.reduce((sum,type)=>sum+type.totalFields,0):null)} page={page} onService={chooseService} onCreateService={submitService} onEditService={submitServiceEdit} onSnapshot={chooseSnapshot} onImport={importSnapshot} onRenameSnapshot={submitSnapshotName} snapshotDisplayName={remote.selected?.displayName} onPage={next=>{if(!mockSelected&&next==='operations'){goOperations('');return}if(!mockSelected&&next==='requests'){goRequests();return}setPage(next);setQuery('');setDetail(null);setOperationKind('all');setSort('date')}} onMetric={summaryAction}/>{message&&<div className="toast" role="status">{message}<button onClick={()=>setMessage('')}>×</button></div>}{adminOpen?<AdminUsers key={auth.revision} auth={auth} services={catalog.services.filter(service=>service.source==='backend')} onClose={()=>setAdminRevision(null)}/>:<main className={`analytics-main page-${page}`} aria-labelledby={`analytics-section-${page}`}>{page==='history'&&<div className="view-heading"><h1 id="analytics-section-history">История прогонов</h1></div>}<div className="view-body">{!mockSelected&&page==='history'&&remoteService
-  ?<BackendRunHistory key={`${serviceScope}:${historyVersion}`} serviceId={remoteService.id} snapshots={snapshots}
-    snapshotsReady={remoteList.kind!=='loading'} selectedId={apiRun?.id} onSelect={chooseApiRun}/>
-  :realAnalytics?realAnalytics:!mockSelected&&(page!=='schema'||!remoteGraphData)?<div className="content-panel">
-  {page==='history'?<Empty text={catalog.state.kind==='error'?catalog.state.error.message:'Загружаем выбранный сервис…'}/>:
-   page!=='schema'?<Empty text="Выберите прогон в истории, чтобы открыть аналитику."/>:
-   <div className="empty-state" role={runCoverage.error||schemaError&&!runCoverage.loading?'alert':'status'}>
-    <p>{!remoteService&&catalog.state.kind==='error'?catalog.state.error.message:remoteMessage}</p>
-    {schemaError&&!runCoverage.loading&&<button type="button" onClick={remoteList.kind==='error'?remote.snapshots.retry:remote.graph.retry}>Повторить</button>}
-   </div>}
- </div>:page==='schema'?<><SchemaExplorer key={viewKey} types={graphTypes} coverageAvailable={coverageAvailable} emptyMessage={mockSelected?undefined:'В графе снимка нет типов.'} coverageRequest={explorerRequest} selectedType={detail?.kind==='type'?detail.id:detail?.kind==='field'?detail.id.split('.')[0]:null} selectedField={detail?.kind==='field'?detail.id:null} onType={name=>focusExplorer(name)} onField={(type,field)=>focusExplorer(type,field)} onClear={clearExplorerSelection} onOverview={showOverview}/><div className="content-panel">
-  <div className="panel-tools schema-panel-tools">
-   <span>{graphTypes.length} типов · {graph.edges.length} связей</span>
-   <div className="schema-view-actions">
-    <div className="segmented" role="group" aria-label="Режим просмотра схемы">
-     <button className={mode==='graph'?'active':''} aria-pressed={mode==='graph'} onClick={()=>setMode('graph')}>Граф</button>
-     <button className={mode==='table'?'active':''} aria-pressed={mode==='table'} onClick={()=>setMode('table')}>Таблица</button>
+ return <div className="analytics-app">
+  <TopChrome adminOpen={adminOpen} onAdmin={()=>setAdminRevision(auth.revision)}
+   canFinish={canFinishRun} coverageRefreshing={runCoverage.loading}
+   contextRefreshing={!apiRun&&(remote.graph.refreshing||remote.snapshots.refreshing)}
+   intent={intent} onAction={requestAction} onCloseAction={closeAction}
+   auth={auth} catalog={catalog} serviceId={serviceId} snapshots={snapshots}
+   snapshot={selectedSnapshot} snapshotStatus={snapshotStatus} apiRun={apiRun}
+   onCreateRun={submitApiRun}
+   onFinishRun={()=>{if(apiRun?.status==='running')setFinishRequest({scope:serviceScope,run:apiRun})}}
+   backendStats={stats.data} statsLoading={stats.loading} summaryErrors={summaryErrors}
+   onRefresh={refreshContext} onRefreshSummary={refreshRunAnalytics}
+   coverage={coverageSummary}
+   schemaFieldCount={coverageSummary?.totalFields??snapshotGraph?.summary.totalFields??null}
+   page={page} onService={chooseService} onCreateService={submitService}
+   onEditService={submitServiceEdit} onSnapshot={chooseSnapshot} onImport={importSnapshot}
+   onRenameSnapshot={submitSnapshotName} snapshotDisplayName={remote.selected?.displayName}
+   onPage={next=>{
+    if(next==='operations'){goOperations('');return}
+    if(next==='requests'){goRequests();return}
+    setPage(next);setQuery('');setDetail(null);setSort('date');
+   }} onMetric={summaryAction}/>
+  {message&&<div className="toast" role="status">{message}<button onClick={()=>setMessage('')}>×</button></div>}
+  {adminOpen?<AdminUsers key={auth.revision} auth={auth}
+    services={catalog.state.kind==='ready'?catalog.state.services:[]}
+    onClose={()=>setAdminRevision(null)}/>:
+   <main className={`analytics-main page-${page}`} aria-labelledby={`analytics-section-${page}`}>
+    {page==='history'&&<div className="view-heading"><h1 id="analytics-section-history">История прогонов</h1></div>}
+    <div className="view-body">
+     {page==='history' ? (
+      remoteService
+       ? <BackendRunHistory key={`${serviceScope}:${historyVersion}`} serviceId={remoteService.id}
+           snapshots={snapshots} snapshotsReady={remoteList.kind!=='loading'}
+           selectedId={apiRun?.id} onSelect={chooseApiRun}/>
+       : <div className="content-panel"><Empty text={catalog.state.kind==='error'?catalog.state.error.message:'Выберите доступный сервис для просмотра истории.'}/></div>
+     ) : realAnalytics ? realAnalytics : page!=='schema' ? (
+      <div className="content-panel"><Empty text="Выберите прогон в истории, чтобы открыть аналитику."/></div>
+     ) : !remoteGraphData ? (
+      <div className="content-panel">
+       <div className="empty-state" role={runCoverage.error||schemaError&&!runCoverage.loading?'alert':'status'}>
+        <p>{!remoteService&&catalog.state.kind==='error'?catalog.state.error.message:
+            !remoteService?'Выберите сервис, чтобы открыть схему.':remoteMessage}</p>
+        {schemaError&&!runCoverage.loading&&<button type="button" onClick={remoteList.kind==='error'?remote.snapshots.retry:remote.graph.retry}>Повторить</button>}
+       </div>
+      </div>
+     ) : <>
+      <SchemaExplorer key={viewKey} types={graphTypes} coverageAvailable={coverageAvailable}
+       emptyMessage="В графе снимка нет типов." coverageRequest={explorerRequest}
+       selectedType={detail?.kind==='type'?detail.id:detail?.kind==='field'?detail.id.split('.')[0]:null}
+       selectedField={detail?.kind==='field'?detail.id:null}
+       onType={name=>focusExplorer(name)} onField={(type,field)=>focusExplorer(type,field)}
+       onClear={clearExplorerSelection} onOverview={showOverview}/>
+      <div className="content-panel">
+       <div className="panel-tools schema-panel-tools">
+        <span>{graphTypes.length} типов · {graph.edges.length} связей</span>
+        <div className="schema-view-actions">
+         <div className="segmented" role="group" aria-label="Режим просмотра схемы">
+          <button className={mode==='graph'?'active':''} aria-pressed={mode==='graph'} onClick={()=>setMode('graph')}>Граф</button>
+          <button className={mode==='table'?'active':''} aria-pressed={mode==='table'} onClick={()=>setMode('table')}>Таблица</button>
+         </div>
+        </div>
+       </div>
+       {mode==='graph'?
+        <div className="flow-space">
+         {!graphTypes.length&&<div className="schema-empty-hint">В графе снимка нет типов.</div>}
+         <ReactFlow key={viewKey} nodes={graph.nodes} onNodesChange={onNodesChange} edges={graph.edges}
+          onEdgeMouseEnter={(_,edge)=>setHoveredField(edge.sourceHandle?.replace(/^field:/,'')??null)}
+          onEdgeMouseLeave={()=>setHoveredField(null)}
+          onEdgeClick={(_,edge)=>{
+           const field=edge.sourceHandle?.replace(/^field:/,'');if(!field)return;
+           const dot=field.indexOf('.');if(dot>=0)openField(field.slice(0,dot),field.slice(dot+1));
+          }}
+          nodeTypes={{type:TypeNode}} edgeTypes={{routed:RoutedEdge}} nodesConnectable={false}>
+          <Background gap={18} color="var(--graph-dot)"/>
+          <GraphControls hasNodes={graph.nodes.length>0}/>
+         </ReactFlow>
+        </div>
+        :<SchemaCoverageTable key={viewKey} types={graphTypes}
+          coverageAvailable={coverageAvailable} query={query} filter={fieldFilter}
+          sort={sort} selectedField={detail?.kind==='field'?detail.id:null}
+          onQuery={setQuery} onFilter={setFieldFilter} onSort={setSort} onField={openField}/>
+       }
+      </div>
+     </>}
+     {page==='schema'&&(detail?.kind==='type'||detail?.kind==='field')&&<SchemaDetailPanel
+      showUsage={false} showAnalyticsLinks={Boolean(apiRun)}
+      canOpenRequests={mayReadJournal(session?.user.role)}
+      types={graphTypes} snapshot={detailSnapshot} sdlMessage={sdlMessage}
+      operations={[]} requests={[]} history={schemaHistory}
+      onBack={()=>travelSchema(-1)} onForward={()=>travelSchema(1)}
+      onClose={()=>setDetail(null)} onTab={changeSchemaTab}
+      onType={(name,edgeId)=>focusExplorer(name,undefined,edgeId)}
+      onField={(type,field)=>focusExplorer(type,field)}
+      onOperations={goOperations} onRequests={field=>goRequests('all',field)}
+     />}
     </div>
-   </div>
-  </div>
- {mode==='graph'?<><div className="flow-space">{!schemaId&&<div className="schema-empty-hint">Схем пока нет. Добавьте снимок через селектор в верхней панели.</div>}{!mockSelected&&!graphTypes.length&&<div className="schema-empty-hint">В графе снимка нет типов.</div>}<ReactFlow key={viewKey} nodes={graph.nodes} onNodesChange={onNodesChange} edges={graph.edges} onEdgeMouseEnter={(_,edge)=>setHoveredField(edge.sourceHandle?.replace(/^field:/,'')??null)} onEdgeMouseLeave={()=>setHoveredField(null)} onEdgeClick={(_,edge)=>{const field=edge.sourceHandle?.replace(/^field:/,'');if(!field)return;const dot=field.indexOf('.');if(dot>=0)openField(field.slice(0,dot),field.slice(dot+1))}} nodeTypes={{type:TypeNode}} edgeTypes={{routed:RoutedEdge}} nodesConnectable={false}><Background gap={18} color="var(--graph-dot)"/><GraphControls hasNodes={graph.nodes.length>0}/></ReactFlow></div></>:<SchemaCoverageTable
-  key={viewKey}
-  sdl={snapshot?.sdl}
-  types={graphTypes}
-  coverageAvailable={coverageAvailable}
-  query={query}
-  filter={fieldFilter}
-  sort={sort}
-  selectedField={detail?.kind === 'field' ? detail.id : null}
-  onQuery={setQuery}
-  onFilter={setFieldFilter}
-  onSort={setSort}
-  onField={openField}
- /> }</div></>:page==='operations'?<div className="content-panel"><div className="panel-tools"><input placeholder="Поиск операции" value={query} onChange={e=>setQuery(e.target.value)}/><select value={operationKind} onChange={e=>setOperationKind(e.target.value)}><option value="all">Все типы</option><option>Query</option><option>Mutation</option></select><label><input type="checkbox" checked={operationErrors} onChange={e=>setOperationErrors(e.target.checked)}/> С ошибками</label><select value={sort} onChange={e=>setSort(e.target.value)}><option value="date">По частоте</option><option value="duration">По времени</option><option value="errors">По ошибкам</option></select><button onClick={()=>{setQuery('');setOperationKind('all');setOperationErrors(false);setOperationField('')}}>Сбросить</button></div>{operationField&&<div className="active-filter">Поле: {operationField} <button onClick={()=>setOperationField('')}>×</button></div>}{visibleOps.length?<OperationsTable selectedId={detail?.kind==='operation'?detail.id:undefined}
-    onSelect={id=>{setDetail({kind:'operation',id});setDetailTab('Информация')}}
-    rows={visibleOps.map(op=>({
-      id:op.id,name:op.name,kind:op.kind==='Query'?'query':'mutation',
-      count:op.count,httpErrors:op.httpErrors,graphqlErrors:op.graphqlErrors,
-      averageMs:op.averageMs,fieldCount:op.fields.length,
-    }))}/>:<Empty text="Операции не найдены"/>}</div>:page==='requests'?<div className="content-panel"><div className="panel-tools"><input placeholder="Имя операции" value={query} onChange={e=>setQuery(e.target.value)}/><select value={operationKind} onChange={e=>setOperationKind(e.target.value)}><option value="all">Query и Mutation</option><option>Query</option><option>Mutation</option></select><select value={requestFilter} onChange={e=>setRequestFilter(e.target.value as RequestFilter)}><option value="all">Все статусы</option><option value="http">HTTP 4xx/5xx</option><option value="graphql">GraphQL-ошибки</option><option value="analyzer">Ошибки анализа</option></select><select value={requestField} onChange={e=>setRequestField(e.target.value)}><option value="">Все поля</option>{coverage?.types.flatMap(t=>t.fields.map(f=><option key={fieldId(t.name,f.name)} value={fieldId(t.name,f.name)}>{fieldId(t.name,f.name)}</option>))}</select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="date">Сначала новые</option><option value="duration">Долгие сначала</option></select><button onClick={()=>{setQuery('');setRequestFilter('all');setRequestField('');setRequestOperation('');setOperationKind('all')}}>Сбросить</button></div>{requestOperation&&<div className="active-filter">Структура операции: {store.operations.find(o=>o.id===requestOperation)?.name} <button onClick={()=>setRequestOperation('')}>×</button></div>}<div className="table-scroll"><table><thead><tr><th>Дата и время</th><th>Операция</th><th>Тип</th><th>HTTP</th><th>GraphQL</th><th>Длительность</th><th>Анализ</th></tr></thead><tbody>{visibleRequests.map(r=>{const op=store.operations.find(o=>o.id===r.operationId);return <tr key={r.id} onClick={()=>{setDetail({kind:'request',id:r.id});setDetailTab('Информация')}}><td>{fmt(r.at)}</td><td><b>{op?.name}</b></td><td>{op?.kind}</td><td><Status yes={r.httpStatus<400} label={String(r.httpStatus)}/></td><td>{r.graphqlErrors.length?'Есть':'—'}</td><td>{r.durationMs} мс</td><td>{r.analyzerError?'Ошибка':'Успешно'}</td></tr>})}</tbody></table>{!visibleRequests.length&&<Empty text="Обращения не найдены"/>}</div></div>:<div className="content-panel"><div className="panel-tools"><button onClick={createRun} disabled={!snapshot}>+ Новый прогон</button>{run?.status==='active'&&<button onClick={finishRun}>Завершить прогон</button>}<input placeholder="Поиск прогона" value={query} onChange={e=>setQuery(e.target.value)}/><select value={operationKind} onChange={e=>setOperationKind(e.target.value)}><option value="all">Все статусы</option><option value="active">Активные</option><option value="completed">Завершённые</option></select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="date">По дате</option><option value="coverage">По покрытию</option></select><button onClick={()=>{setQuery('');setOperationKind('all')}}>Сбросить</button></div><div className="table-scroll"><table><thead><tr><th>Прогон</th><th>Статус</th><th>Начало</th><th>Завершение</th><th>Длительность</th><th>Обращения</th><th>HTTP</th><th>GraphQL</th><th>Покрытие</th><th>Схема</th></tr></thead><tbody>{history.map(r=>{const snap=store.snapshots.find(s=>s.id===r.snapshotId)!;const m=metricsFor(requestsFor(store,r.id));const c=coverageFor(snap,r,store);return <tr key={r.id} className={r.id===runId?'selected':''} onClick={()=>{chooseRun(r.id);setPage('schema');setMode('graph')}}><td><b>{r.name}</b></td><td><span className={'run-state '+r.status}>{r.status==='active'?'Активен':'Завершён'}</span></td><td>{fmt(r.startedAt)}</td><td>{fmt(r.endedAt)}</td><td>{duration(r)}</td><td>{m.total}</td><td>{m.httpErrors}</td><td>{m.graphqlErrors}</td><td>{c.summary.coveragePercent.toFixed(2)}%</td><td>{snap.name}</td></tr>})}</tbody></table>{!history.length&&<Empty text="Прогоны не найдены"/>}</div></div>}{page==='schema'&&(detail?.kind==='type'||detail?.kind==='field')&&<SchemaDetailPanel showUsage={mockSelected} showAnalyticsLinks={Boolean(apiRun)} canOpenRequests={mayReadJournal(session?.user.role)} types={graphTypes} snapshot={detailSnapshot} sdlMessage={sdlMessage} operations={operations} requests={requests} history={schemaHistory} onBack={()=>travelSchema(-1)} onForward={()=>travelSchema(1)} onClose={()=>setDetail(null)} onTab={changeSchemaTab} onType={(name,edgeId)=>focusExplorer(name,undefined,edgeId)} onField={(type,field)=>focusExplorer(type,field)} onOperations={goOperations} onRequests={field=>goRequests('all',field)}/>}{detail&&(detail.kind==='operation'||detail.kind==='request')&&<aside className="detail-panel"><div className="detail-head"><strong>Подробности</strong><button onClick={()=>setDetail(null)} aria-label="Закрыть подробности">×</button></div>{detail.kind==='operation'&&selectedOp&&<><small>{selectedOp.kind}</small><h2>{selectedOp.name}</h2><div className="detail-tabs">{['Информация','GraphQL-код'].map(x=><button key={x} className={detailTab===x?'active':''} onClick={()=>setDetailTab(x)}>{x}</button>)}</div>{detailTab==='GraphQL-код'?<CodeView code={selectedOp.document}/>:<><p>Структура: <code>{selectedOp.id}</code></p><p>Выполнений: {operations.find(o=>o.id===selectedOp.id)?.count}</p><h3>Затронутые поля</h3>{selectedOp.fields.map(f=><button className="detail-list-row" key={fieldId(f.type,f.field)} onClick={()=>{setPage('schema');setMode('graph');openField(f.type,f.field)}}>{fieldId(f.type,f.field)}</button>)}<button className="primary" onClick={()=>goRequests('all','',selectedOp.id)}>Показать обращения</button></>}</>}{detail.kind==='request'&&selectedRequest&&<><small>ОБРАЩЕНИЕ · {selectedRequest.id}</small><h2>{store.operations.find(o=>o.id===selectedRequest.operationId)?.name}</h2><div className="detail-tabs">{['Информация','Поля','GraphQL-код','Ошибки'].map(x=><button key={x} className={detailTab===x?'active':''} onClick={()=>setDetailTab(x)}>{x}</button>)}</div>{detailTab==='Информация'?<dl><dt>Дата</dt><dd>{fmt(selectedRequest.at)}</dd><dt>HTTP</dt><dd>{selectedRequest.httpStatus}</dd><dt>GraphQL ошибки</dt><dd>{selectedRequest.graphqlErrors.length}</dd><dt>Длительность</dt><dd>{selectedRequest.durationMs} мс</dd><dt>Анализ</dt><dd>{selectedRequest.analyzerError??'Успешно'}</dd></dl>:detailTab==='Поля'?store.operations.find(o=>o.id===selectedRequest.operationId)?.fields.map(f=><button className="detail-list-row" key={fieldId(f.type,f.field)} onClick={()=>{setPage('schema');setMode('graph');openField(f.type,f.field)}}>{fieldId(f.type,f.field)} →</button>):detailTab==='GraphQL-код'?<CodeView code={selectedRequest.safeDocument}/>:<>{selectedRequest.analyzerError&&<p>{selectedRequest.analyzerError}</p>}{selectedRequest.graphqlErrors.map((e,i)=><p key={i}>{e.message} · {e.path} · {e.line}:{e.column}</p>)}{!selectedRequest.graphqlErrors.length&&!selectedRequest.analyzerError&&<Empty text="Ошибок нет"/>}</>}</>}</aside>}</div></main>}{finishTarget&&<FinishRunDialog key={finishTarget.id} run={finishTarget} onFinish={completeApiRun} onClose={()=>setFinishRequest(null)}/>}</div>}
-function Status({yes,label}:{yes:boolean;label?:string}){return <span className={`status ${yes?'ok':'bad'}`}>{label??(yes?'Покрыто':'Не покрыто')}</span>}
+   </main>}
+  {finishTarget&&<FinishRunDialog key={finishTarget.id} run={finishTarget}
+    onFinish={completeApiRun} onClose={()=>setFinishRequest(null)}/>}
+ </div>
+}
 function Empty({text}:{text:string}){return <div className="empty-state">{text}</div>}
 export default function AnalyticsApp(){return <ReactFlowProvider><Inner/></ReactFlowProvider>}
 
