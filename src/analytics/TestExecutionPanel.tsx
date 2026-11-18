@@ -4,6 +4,7 @@ import {useComparisonResource} from './useComparisonResource';
 import {TestResourceStatus,TestPagination} from './TestCoverageUi';
 import {executionStatuses,testPercent} from './testCoverageModel';
 import {millis} from './runAnalyticsModel';
+import {EvidenceCounts,EvidenceMeaning} from './FieldEvidenceUi';
 const date=(value:string|null)=>value?new Date(value).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'}):'—';
 export function ExecutionFieldLink({field,onField}:{field:ExecutionFieldOut;onField:(type:string,name:string)=>void}){
  return <button type="button" className="detail-list-row" onClick={()=>onField(field.typeName,field.fieldName)}>{field.typeName}.{field.fieldName} · {field.hits} hits →</button>;
@@ -14,5 +15,7 @@ export function TestExecutionPanel({execution,loading,error,onRetry,onClose,onRe
 function ExecutionFields({execution,scope,revision,onField}:{execution:ExecutionOut;scope:string;revision:number;onField:(type:string,field:string)=>void}){
  const [open,setOpen]=useState(false),[offset,setOffset]=useState(0);
  const resource=useComparisonResource(open?JSON.stringify([scope,execution.runId,execution.id,offset,revision]):null,signal=>getExecutionFields(execution.runId,execution.id,offset,signal));
- return <details className="test-execution-fields" open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary>Поля GraphQL</summary>{open&&<><TestResourceStatus resource={resource}/>{resource.data&&<><ul className="test-fields-list">{resource.data.rows.map(f=><li key={`${f.typeName}.${f.fieldName}`}><ExecutionFieldLink field={f} onField={onField}/><details><summary>Показатели выбора и наблюдения</summary><dl><dt>Выбирали поле</dt><dd>{f.selectedRequestCount}</dd><dt>Присутствие подтверждено</dt><dd>{f.observedCount}</dd><dt>notObserved</dt><dd>{f.notObservedCount}</dd><dt>indeterminate</dt><dd>{f.indeterminateCount}</dd><dt>unavailable</dt><dd>{f.unavailableCount}</dd></dl></details></li>)}</ul>{!resource.data.rows.length&&<p>Нет данных о полях этого выполнения.</p>}<TestPagination page={resource.data} offset={offset} size={100} onPage={setOffset}/></>}</>}</details>;
+ return <details className="test-execution-fields" open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary>Поля GraphQL</summary>{open&&<><TestResourceStatus resource={resource}/>{resource.data&&<><ul className="test-fields-list">{resource.data.rows.map(f=><ExecutionFieldRow key={`${f.typeName}.${f.fieldName}`} field={f} onField={onField}/>)}</ul><EvidenceMeaning/>{!resource.data.rows.length&&<p>Нет данных о полях этого выполнения.</p>}<TestPagination page={resource.data} offset={offset} size={100} onPage={setOffset}/></>}</>}</details>;
 }
+
+export function ExecutionFieldRow({field,onField}:{field:ExecutionFieldOut;onField:(type:string,name:string)=>void}){return <li><ExecutionFieldLink field={field} onField={onField}/><EvidenceCounts observed={field.observedCount} notObserved={field.notObservedCount} indeterminate={field.indeterminateCount} unavailable={field.unavailableCount}/><details><summary>Выбор поля в запросах</summary><dl><dt>Выбрано в запросах</dt><dd>{field.selectedRequestCount}</dd></dl><p>Hits относятся к обычному Schema Coverage. Четыре счётчика показывают состояния разных обращений; единого статуса наличия у поля за весь тест нет.</p></details></li>}

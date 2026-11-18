@@ -13,7 +13,7 @@ import {SchemaExplorer} from './SchemaExplorer';
 import {SchemaDetailPanel} from './SchemaDetailPanel';
 import {SchemaCoverageTable} from './SchemaCoverageTable';
 import type {CoverageFilter} from './coverageTableFilters';
-import {currentStep,emptyHistory,moveStep,pushStep,updateStep,type InvestigationHistory} from './schemaInvestigation';
+import {needsSchemaDetailSdl,currentStep,emptyHistory,moveStep,pushStep,updateStep,type InvestigationHistory} from './schemaInvestigation';
 import {availableServiceId,useServiceCatalog} from './serviceCatalog';
 import {useAuth} from './useAuth';
 import {ApiError} from '../api/client';
@@ -174,7 +174,7 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
  const graphTypes=remoteTypes;
  const coverageSummary=runCoverage.data?.summary??null;
  const coverageAvailable=coverageSummary!==null;
- const isSdlTab=page==='schema'&&detail?.kind==='type'&&currentStep(schemaHistory)?.tab==='SDL';
+ const isSdlTab=page==='schema'&&Boolean(detail)&&needsSchemaDetailSdl(currentStep(schemaHistory),graphTypes);
  const remoteSdl=useBackendSdl(remoteGraphData&&isSdlTab?remoteGraphData.schemaId:null,graphScope);
  const detailSnapshot=remoteSdl.state.kind==='ready'?{sdl:remoteSdl.state.data}:null;
  const sdlMessage=remoteSdl.state.kind==='error'?remoteSdl.state.error.message:

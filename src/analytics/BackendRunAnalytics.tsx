@@ -10,6 +10,7 @@ import {useRequestPathSearch} from './useRequestPathSearch';
 import {RequestPathContext} from './RequestPathContext';
 import './requestPaths.css';
 import {RelatedExecution} from './RelatedTestExecutions';
+import {RequestFieldEvidence} from './RequestFieldEvidence';
 
 type Props = {
   testExecutionId?:string;onTest?:(id:string)=>void;onClearTest?:()=>void;
@@ -167,7 +168,7 @@ export function BackendRequests(p:Props) {
       </dl>
       {request.operationKey&&<button className="run-control" onClick={()=>p.onOperation(request.operationKey!)}>Открыть операцию</button>}
       <RelatedExecution key={`${p.scope}:${request.id}:${request.testExecutionId??'none'}`} runId={p.runId} executionId={request.testExecutionId} scope={p.scope} revision={p.revision} onOpen={p.onTest}/>
-      <h3>Поля</h3>{request.selectedFields.length?request.selectedFields.map(f=><button className="detail-list-row" key={`${f.typeName}.${f.fieldName}`} onClick={()=>p.onField(f.typeName,f.fieldName)}>{f.typeName}.{f.fieldName}{f.returnType?` · ${f.returnType}`:''} →</button>):<p>Нет данных о полях.</p>}
+      <h3>Поля</h3><RequestFieldEvidence key={JSON.stringify([p.scope,p.runId,p.snapshotId,request.id])} request={request} snapshotId={p.snapshotId} scope={p.scope} allowed={allowed} onField={p.onField}/>
       <h3>GraphQL-код</h3>{request.documentAvailability==='redacted'&&<p>Чувствительные значения скрыты сервером.</p>}{request.documentAvailability!=='unavailable'&&request.safeGraphqlDocument?<CodeView code={request.safeGraphqlDocument}/>:<p>Безопасный документ недоступен.</p>}
       </>:<Result {...details} empty="Нет данных обращения."/>}
     </aside>}
