@@ -29,6 +29,9 @@ import type {SnapshotImport} from './schemaImport';
 import {createRun as postRun, finishRun as postFinishRun, findRun, type RunOut} from '../api/runs';
 import {runActionError, selectedRun, runSelectionForHistory, type RunSelection} from './backendRuns';
 import {BackendOperations, BackendRequests} from './BackendRunAnalytics';
+import {BackendTests} from './BackendTests';
+import {defaultTestView,testContextValue,testJournalNavigation,type ContextualTest,type TestListView} from './testCoverageModel';
+import type {ExecutionOut} from '../api/testCoverage';
 import {analyticsError, mayReadJournal} from './runAnalyticsModel';
 import {readWorkspace, saveWorkspace} from './workspaceSelection';
 import {BackendRunHistory} from './BackendRunHistory';
@@ -48,11 +51,14 @@ import './context.css';
 import './workspace.css';
 import './workspaceDark.css';
 import './profileAdmin.css';
-type Page='schema'|'operations'|'requests'|'history';
+type Page='schema'|'operations'|'requests'|'tests'|'history';
 type RequestFilter='all'|'http'|'graphql'|'analyzer';
 const emptyGraphTypes:GraphType[]=[];
 function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useRef(saved?.runId??null);const [serviceId,setServiceId]=useState(saved?.serviceId??''),[snapshotId,setSnapshotId]=useState(saved?.snapshotId??''),[page,setPage]=useState<Page>('schema'),[mode,setMode]=useState<'graph'|'table'>('graph'),[fieldFilter,setFieldFilter]=useState<CoverageFilter>('all'),[query,setQuery]=useState(''),[requestFilter,setRequestFilter]=useState<RequestFilter>('all'),[requestField,setRequestField]=useState(''),[requestOperation,setRequestOperation]=useState(''),[operationField,setOperationField]=useState(''),[sort,setSort]=useState('date'),[detail,setDetail]=useState<{kind:'type'|'field';id:string}|null>(null),[schemaHistory,setSchemaHistory]=useState<InvestigationHistory>(emptyHistory),[explorerRequest,setExplorerRequest]=useState(0),[message,setMessage]=useState('');const flow=useReactFlow();
  const auth=useAuth();
+ const [selectedTest,setSelectedTest]=useState<ContextualTest<string>|null>(null);
+ const [testJournal,setTestJournal]=useState<ContextualTest<string>|null>(null);
+ const [testListView,setTestListView]=useState<ContextualTest<TestListView>|null>(null);
  const [requestPath,setRequestPath]=useState<RequestPathSelection|null>(null);
  const [comparisonOpen,setComparisonOpen]=useState(false);
  const [adminRevision,setAdminRevision]=useState<number|null>(null);
@@ -80,6 +86,10 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
  const schemaId=selectedSnapshot?.id??null;
  const [apiRunSelection,setApiRunSelection]=useState<RunSelection|null>(null);
  const apiRun=remoteService?selectedRun(apiRunSelection,serviceScope,schemaId):null;
+ const testContext=apiRun&&schemaId?{scope:serviceScope,runId:apiRun.id,snapshotId:schemaId}:null;
+ const selectedTestId=testContextValue(selectedTest,testContext);
+ const journalTestId=testContextValue(testJournal,testContext);
+ const activeTestView=testContextValue(testListView,testContext)??defaultTestView;
  const [knownGitlab,setKnownGitlab]=useState<{context:GitlabContext;runId:string;pipeline?:GitlabPipeline}|null>(null);
  const gitlabContext={scope:serviceScope,serviceId,snapshotId:schemaId};
  const gitlabContextRef=useRef(gitlabContext);gitlabContextRef.current=gitlabContext;
@@ -183,6 +193,7 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
   ?'У этого сервиса пока нет снимков схемы. Откройте селектор «Снимок схемы», чтобы импортировать SDL или загрузить схему через introspection.'
   :remoteGraph.kind==='loading'?'Загружаем граф схемы…':'Загружаем снимки схемы…');
  const resetSchemaNavigation=useCallback(()=>{
+  setSelectedTest(null);setTestJournal(null);setTestListView(null);
   setRequestPath(null);
   setSchemaHistory(emptyHistory);
   setDetail(null);
@@ -277,8 +288,10 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
  const travelSchema=(direction:-1|1)=>{const next=moveStep(updateStep(schemaHistory,{viewport:flow.getViewport()}),direction);if(next===schemaHistory||next.index===schemaHistory.index)return;setSchemaHistory(next);const step=currentStep(next)!;setDetail({kind:step.kind,id:step.id});setMode('graph');requestAnimationFrame(()=>requestAnimationFrame(()=>{void flow.setViewport(step.viewport,{duration:300})}))};
  const changeSchemaTab=(tab:'Обзор'|'Связи'|'SDL')=>setSchemaHistory(old=>updateStep(old,{tab}));
  const goOperations=(field:string)=>{setBackendNavigation(value=>value+1);setBackendOperationKey('');setPage('operations');setOperationField(field);setQuery('');setDetail(null)};
- const goRequests=(filter:RequestFilter='all',field='',operation='')=>{setRequestPath(null);setBackendNavigation(value=>value+1);setPage('requests');setRequestFilter(filter);setRequestField(field);setRequestOperation(operation);setSort('date');setQuery('');setDetail(null)};
+ const goRequests=(filter:RequestFilter='all',field='',operation='')=>{setTestJournal(null);setRequestPath(null);setBackendNavigation(value=>value+1);setPage('requests');setRequestFilter(filter);setRequestField(field);setRequestOperation(operation);setSort('date');setQuery('');setDetail(null)};
  const findRequestsForPath=(path:SchemaCoordinate[])=>{if(!apiRun||!schemaId||!path.length)return;const next=pathSearchNavigation(serviceScope,apiRun.id,schemaId,path);goRequests('all',next.field);setRequestPath(next)};
+ const openTests=(executionId?:string)=>{setRequestPath(null);setComparisonOpen(false);setDetail(null);if(testContext&&executionId)setSelectedTest({...testContext,value:executionId});setPage('tests')};
+ const showTestRequests=(execution:ExecutionOut)=>{if(!testContext||execution.runId!==testContext.runId)return;const next=testJournalNavigation(testContext,execution.id);goRequests('all',next.field,next.operationKey);setSelectedTest({...testContext,value:next.executionId});setTestJournal({...testContext,value:next.executionId})};
  const summaryAction=(key:string)=>{if(key==='zero-types'){setPage('schema');setMode('graph');setExplorerRequest(value=>value+1);setDetail(null);return}if(key==='operations'){goOperations('');return}const target=summaryDestination(key);setDetail(null);setQuery('');if(target.page==='schema'){setPage('schema');setMode(target.mode as 'graph'|'table');setFieldFilter(target.filter as CoverageFilter)}else{goRequests(target.filter as RequestFilter);if('sort'in target&&target.sort)setSort(target.sort)}};
  const applyImportedSnapshot=(id:string)=>{
   setSnapshotId(id);
@@ -331,7 +344,7 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
   if(!selection)return;
   pendingRestore.current=null;
   if(schemaId!==next.snapshotId)chooseSnapshot(next.snapshotId);
-  if(apiRun?.id!==next.id){setRequestPath(null);setCoverageVersion(version=>version+1);setOperationField('');setRequestField('');setRequestOperation('');setRequestFilter('all');setBackendOperationKey('');}
+  if(apiRun?.id!==next.id){setSelectedTest(null);setTestJournal(null);setTestListView(null);setRequestPath(null);setCoverageVersion(version=>version+1);setOperationField('');setRequestField('');setRequestOperation('');setRequestFilter('all');setBackendOperationKey('');}
   setApiRunSelection(selection);
   setPage('schema');
   setMode('graph');
@@ -479,20 +492,21 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
   });
   return ()=>cancelAnimationFrame(frame);
  },[page,mode,schemaId,viewKey,nodesReady,graph.nodes,flow]);
+ const testAnalytics=apiRun&&page==='tests'&&<BackendTests key={JSON.stringify([serviceScope,schemaId,apiRun.id])} scope={`${serviceScope}:${schemaId}:${apiRun.status}`} runId={apiRun.id} revision={analysisRevision} role={session?.user.role} selectedId={selectedTestId} onSelect={id=>setSelectedTest(testContext&&id?{...testContext,value:id}:null)} onRequests={showTestRequests} onField={(type,field)=>{setPage('schema');focusExplorer(type,field)}} view={activeTestView} onView={value=>setTestListView(testContext?{...testContext,value}:null)}/>;
  const realAnalytics=apiRun&&(page==='operations'||page==='requests')&&(()=>{
   const Analytics=page==='operations'?BackendOperations:BackendRequests;
   return <Analytics key={JSON.stringify([analysisScope,page,backendNavigation])} scope={analysisScope!} revision={analysisRevision}
-   snapshotId={schemaId??undefined} requestPath={page==='requests'?activeRequestPath:undefined} onClearPath={()=>setRequestPath(null)} runId={apiRun.id} role={session?.user.role} field={page==='operations'?operationField:requestField}
+   testExecutionId={page==='requests'?journalTestId:undefined} onTest={openTests} onClearTest={()=>setTestJournal(null)} snapshotId={schemaId??undefined} requestPath={page==='requests'?activeRequestPath:undefined} onClearPath={()=>setRequestPath(null)} runId={apiRun.id} role={session?.user.role} field={page==='operations'?operationField:requestField}
    operationKey={page==='operations'?backendOperationKey:requestOperation} filter={requestFilter} sort={sort} types={graphTypes} stats={stats.data}
    onField={(type,field)=>{setPage('schema');focusExplorer(type,field)}}
    onRequests={key=>goRequests('all','',key)} onOperation={key=>{goOperations('');setBackendOperationKey(key)}}
-   onClearContext={()=>{if(page==='operations')setOperationField('');else {setRequestPath(null);setRequestField('');setRequestOperation('')}}}
+   onClearContext={()=>{if(page==='operations')setOperationField('');else {setTestJournal(null);setRequestPath(null);setRequestField('');setRequestOperation('')}}}
    />;
  })();
- return <div className="analytics-app"><TopChrome onGitlab={submitGitlabRun} gitlabManaged={Boolean(gitlab.data)||Boolean(pendingGitlab&&pendingGitlab.runId===trackedRunId)} gitlabChecking={gitlab.loading} showSummary={!comparisonOpen} adminOpen={adminOpen} onAdmin={()=>setAdminRevision(auth.revision)} canFinish={canFinishRun&&gitlab.canFinish} coverageRefreshing={runCoverage.loading} contextRefreshing={!apiRun&&(remote.graph.refreshing||remote.snapshots.refreshing)} intent={intent} onAction={requestAction} onCloseAction={closeAction} auth={auth} catalog={catalog} serviceId={serviceId} snapshots={snapshots} snapshot={selectedSnapshot} snapshotStatus={snapshotStatus} apiRun={apiRun} onCreateRun={submitApiRun} onFinishRun={()=>{if(gitlab.canFinish&&apiRun?.status==='running')setFinishRequest({scope:serviceScope,run:apiRun})}} backendStats={stats.data} statsLoading={stats.loading} summaryErrors={summaryErrors} onRefresh={refreshContext} onRefreshSummary={refreshRunAnalytics} coverage={coverageSummary} schemaFieldCount={coverageSummary?.totalFields??snapshotGraph?.summary.totalFields??null} page={page} onService={chooseService} onCreateService={submitService} onEditService={submitServiceEdit} onSnapshot={chooseSnapshot} onImport={importSnapshot} onRenameSnapshot={submitSnapshotName} snapshotDisplayName={remote.selected?.displayName} onPage={next=>{setComparisonOpen(false);if(next==='operations'){goOperations('');return}if(next==='requests'){goRequests();return}setPage(next);setQuery('');setDetail(null);setSort('date')}} onMetric={summaryAction}/>{!adminOpen&&!comparisonOpen&&trackedRunId&&<GitlabRunStatus state={gitlab} requests={apiRun?.id===trackedRunId?stats.data?.totalRequests:undefined} coverage={apiRun?.id===trackedRunId?runCoverage.data?.summary.coveragePercent:null}/>} {message&&<div className="toast" role="status">{message}<button onClick={()=>setMessage('')}>×</button></div>}{adminOpen?<AdminUsers key={auth.revision} auth={auth} services={catalog.services.filter(service=>service.source==='backend')} onClose={()=>setAdminRevision(null)}/>:<main className={`analytics-main page-${comparisonOpen?'comparison':page}`} aria-labelledby={comparisonOpen?undefined:`analytics-section-${page}`} aria-label={comparisonOpen?'Сравнение прогонов':undefined}>{page==='history'&&!comparisonOpen&&<div className="view-heading"><h1 id="analytics-section-history">История прогонов</h1></div>}<div className="view-body">{comparisonOpen&&remoteService?<RunComparison key={JSON.stringify([serviceScope,schemaId])} snapshots={snapshots} initialSnapshotId={schemaId} session={session} onBack={()=>setComparisonOpen(false)}/>:page==='history'&&remoteService
+ return <div className="analytics-app"><TopChrome onGitlab={submitGitlabRun} gitlabManaged={Boolean(gitlab.data)||Boolean(pendingGitlab&&pendingGitlab.runId===trackedRunId)} gitlabChecking={gitlab.loading} showSummary={!comparisonOpen&&page!=='tests'} adminOpen={adminOpen} onAdmin={()=>setAdminRevision(auth.revision)} canFinish={canFinishRun&&gitlab.canFinish} coverageRefreshing={runCoverage.loading} contextRefreshing={!apiRun&&(remote.graph.refreshing||remote.snapshots.refreshing)} intent={intent} onAction={requestAction} onCloseAction={closeAction} auth={auth} catalog={catalog} serviceId={serviceId} snapshots={snapshots} snapshot={selectedSnapshot} snapshotStatus={snapshotStatus} apiRun={apiRun} onCreateRun={submitApiRun} onFinishRun={()=>{if(gitlab.canFinish&&apiRun?.status==='running')setFinishRequest({scope:serviceScope,run:apiRun})}} backendStats={stats.data} statsLoading={stats.loading} summaryErrors={summaryErrors} onRefresh={refreshContext} onRefreshSummary={refreshRunAnalytics} coverage={coverageSummary} schemaFieldCount={coverageSummary?.totalFields??snapshotGraph?.summary.totalFields??null} page={page} onService={chooseService} onCreateService={submitService} onEditService={submitServiceEdit} onSnapshot={chooseSnapshot} onImport={importSnapshot} onRenameSnapshot={submitSnapshotName} snapshotDisplayName={remote.selected?.displayName} onPage={next=>{setComparisonOpen(false);if(next==='operations'){goOperations('');return}if(next==='requests'){goRequests();return}if(next==='tests'){openTests();return}setPage(next);setQuery('');setDetail(null);setSort('date')}} onMetric={summaryAction}/>{!adminOpen&&!comparisonOpen&&trackedRunId&&<GitlabRunStatus state={gitlab} requests={apiRun?.id===trackedRunId?stats.data?.totalRequests:undefined} coverage={apiRun?.id===trackedRunId?runCoverage.data?.summary.coveragePercent:null}/>} {message&&<div className="toast" role="status">{message}<button onClick={()=>setMessage('')}>×</button></div>}{adminOpen?<AdminUsers key={auth.revision} auth={auth} services={catalog.services.filter(service=>service.source==='backend')} onClose={()=>setAdminRevision(null)}/>:<main className={`analytics-main page-${comparisonOpen?'comparison':page}`} aria-labelledby={comparisonOpen?undefined:`analytics-section-${page}`} aria-label={comparisonOpen?'Сравнение прогонов':undefined}>{page==='history'&&!comparisonOpen&&<div className="view-heading"><h1 id="analytics-section-history">История прогонов</h1></div>}<div className="view-body">{comparisonOpen&&remoteService?<RunComparison key={JSON.stringify([serviceScope,schemaId])} snapshots={snapshots} initialSnapshotId={schemaId} session={session} onBack={()=>setComparisonOpen(false)}/>:page==='history'&&remoteService
   ?<BackendRunHistory key={`${serviceScope}:${historyVersion}`} serviceId={remoteService.id} snapshots={snapshots}
     snapshotsReady={remoteList.kind!=='loading'} selectedId={apiRun?.id} onSelect={chooseApiRun} onCompare={()=>setComparisonOpen(true)}/>
-  :realAnalytics?realAnalytics:(page!=='schema'||!remoteGraphData)?<div className="content-panel">
+  :testAnalytics?testAnalytics:realAnalytics?realAnalytics:(page!=='schema'||!remoteGraphData)?<div className="content-panel">
   {page==='history'?<Empty text={catalog.state.kind==='error'?catalog.state.error.message:catalog.state.kind==='loading'?'Загружаем сервисы API…':'Нет доступных сервисов API.'}/>:
    page!=='schema'?<Empty text="Выберите прогон в истории, чтобы открыть аналитику."/>:
    <div className="empty-state" role={runCoverage.error||schemaError&&!runCoverage.loading?'alert':'status'}>
@@ -521,7 +535,7 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
   onFilter={setFieldFilter}
   onSort={setSort}
   onField={openField}
- /> }</div></>:null}{page==='schema'&&(detail?.kind==='type'||detail?.kind==='field')&&<SchemaDetailPanel runId={apiRun?.id} snapshotId={schemaId} resourceScope={serviceScope} onFindPath={findRequestsForPath} showAnalyticsLinks={Boolean(apiRun)} canOpenRequests={mayReadJournal(session?.user.role)} types={graphTypes} snapshot={detailSnapshot} sdlMessage={sdlMessage} history={schemaHistory} onBack={()=>travelSchema(-1)} onForward={()=>travelSchema(1)} onClose={()=>setDetail(null)} onTab={changeSchemaTab} onType={(name,edgeId)=>focusExplorer(name,undefined,edgeId)} onField={(type,field)=>focusExplorer(type,field)} onOperations={goOperations} onRequests={field=>goRequests('all',field)}/>}</div></main>}{finishTarget&&<FinishRunDialog key={finishTarget.id} run={finishTarget} onFinish={completeApiRun} onClose={()=>setFinishRequest(null)}/>}</div>}
+ /> }</div></>:null}{page==='schema'&&(detail?.kind==='type'||detail?.kind==='field')&&<SchemaDetailPanel testRevision={analysisRevision} onTest={openTests} runId={apiRun?.id} snapshotId={schemaId} resourceScope={serviceScope} onFindPath={findRequestsForPath} showAnalyticsLinks={Boolean(apiRun)} canOpenRequests={mayReadJournal(session?.user.role)} types={graphTypes} snapshot={detailSnapshot} sdlMessage={sdlMessage} history={schemaHistory} onBack={()=>travelSchema(-1)} onForward={()=>travelSchema(1)} onClose={()=>setDetail(null)} onTab={changeSchemaTab} onType={(name,edgeId)=>focusExplorer(name,undefined,edgeId)} onField={(type,field)=>focusExplorer(type,field)} onOperations={goOperations} onRequests={field=>goRequests('all',field)}/>}</div></main>}{finishTarget&&<FinishRunDialog key={finishTarget.id} run={finishTarget} onFinish={completeApiRun} onClose={()=>setFinishRequest(null)}/>}</div>}
 function Empty({text}:{text:string}){return <div className="empty-state">{text}</div>}
 export default function AnalyticsApp(){return <ReactFlowProvider><Inner/></ReactFlowProvider>}
 

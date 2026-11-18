@@ -9,8 +9,10 @@ import type {SchemaCoordinate} from '../api/runPaths';
 import {useRequestPathSearch} from './useRequestPathSearch';
 import {RequestPathContext} from './RequestPathContext';
 import './requestPaths.css';
+import {RelatedExecution} from './RelatedTestExecutions';
 
 type Props = {
+  testExecutionId?:string;onTest?:(id:string)=>void;onClearTest?:()=>void;
   snapshotId?:string;requestPath?:readonly SchemaCoordinate[];onClearPath?:()=>void;
   runId: string; scope: string; revision: number; role?: string;
   field: string; operationKey: string; filter: string; sort: string; types: GraphType[]; stats?: RunStats;
@@ -102,11 +104,11 @@ export function BackendRequests(p:Props) {
   const pathActive=Boolean(p.requestPath?.length);
   const pathSearch=useRequestPathSearch({runId:p.runId,snapshotId:p.snapshotId,scope:p.scope,path:p.requestPath,enabled:allowed&&pathActive});
   const [typeName,fieldName]=field.split('.');
-  const query=useMemo<JournalQuery>(()=>({operationName:name, operationKey:p.operationKey||undefined, operationType:kind||undefined,
+  const query=useMemo<JournalQuery>(()=>({testExecutionId:p.testExecutionId,operationName:name, operationKey:p.operationKey||undefined, operationType:kind||undefined,
     typeName:typeName||undefined,fieldName:fieldName||undefined,sortOrder:direction,
     from:from?new Date(from).toISOString():undefined,to:to?new Date(to).toISOString():undefined,sortBy:order==='durationMs'?'durationMs':'createdAt',
     httpStatus:httpCode?Number(httpCode):undefined,graphqlHasErrors:filter==='graphql'?true:undefined,httpStatusClass:filter==='http4'?4:filter==='http5'?5:undefined,
-    analysisStatus:filter in analysisLabels?filter:undefined}),[name,p.operationKey,kind,typeName,fieldName,order,filter,direction,from,to,httpCode]);
+    analysisStatus:filter in analysisLabels?filter:undefined}),[name,p.testExecutionId,p.operationKey,kind,typeName,fieldName,order,filter,direction,from,to,httpCode]);
   const group=filter==='http'||filter==='analyzer'?filter:'';
   const load=useCallback((signal:AbortSignal)=>getFilteredJournal(p.runId,query,offset,group,signal),[p.runId,query,offset,group]);
   const validInterval=!from||!to||from<to;
@@ -144,6 +146,7 @@ export function BackendRequests(p:Props) {
           <label>По <input type="datetime-local" aria-label="Конец интервала" min={from||undefined} value={to} onChange={e=>change(()=>setTo(e.target.value))}/></label>
           <button type="button" onClick={()=>change(()=>{setSearch('');setName(undefined);setKind('');setFilter('all');setOrder('createdAt');setField('');setDirection('desc');setFrom('');setTo('');setHttpCode('');p.onClearContext()})}>Сбросить</button>
         </form></fieldset>
+        {p.testExecutionId&&<div className="active-filter test-journal-context">Выполнение теста: <code>{p.testExecutionId}</code> {p.onTest&&<button type="button" onClick={()=>p.onTest?.(p.testExecutionId!)}>Вернуться к тесту</button>}<button type="button" onClick={()=>change(()=>p.onClearTest?.())}>Сбросить фильтр теста</button></div>}
         {p.operationKey&&<div className="active-filter">Выбрана структура операции <button onClick={p.onClearContext} aria-label="Убрать фильтр операции">×</button></div>}
         {rows?.length?<div className="table-scroll"><table aria-label="Обращения прогона">
           <thead><tr><th>Дата и время</th><th>Операция</th><th>Тип</th><th>HTTP</th><th>GraphQL</th><th>Длительность</th><th>Анализ</th></tr></thead>
@@ -163,6 +166,7 @@ export function BackendRequests(p:Props) {
         <dt>Учтено в покрытии</dt><dd>{yesNo(request.countedInCoverage)}</dd>{request.errorCode&&<><dt>Код ошибки</dt><dd>{request.errorCode}</dd></>}
       </dl>
       {request.operationKey&&<button className="run-control" onClick={()=>p.onOperation(request.operationKey!)}>Открыть операцию</button>}
+      <RelatedExecution key={`${p.scope}:${request.id}:${request.testExecutionId??'none'}`} runId={p.runId} executionId={request.testExecutionId} scope={p.scope} revision={p.revision} onOpen={p.onTest}/>
       <h3>Поля</h3>{request.selectedFields.length?request.selectedFields.map(f=><button className="detail-list-row" key={`${f.typeName}.${f.fieldName}`} onClick={()=>p.onField(f.typeName,f.fieldName)}>{f.typeName}.{f.fieldName}{f.returnType?` · ${f.returnType}`:''} →</button>):<p>Нет данных о полях.</p>}
       <h3>GraphQL-код</h3>{request.documentAvailability==='redacted'&&<p>Чувствительные значения скрыты сервером.</p>}{request.documentAvailability!=='unavailable'&&request.safeGraphqlDocument?<CodeView code={request.safeGraphqlDocument}/>:<p>Безопасный документ недоступен.</p>}
       </>:<Result {...details} empty="Нет данных обращения."/>}

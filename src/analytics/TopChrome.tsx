@@ -24,9 +24,9 @@ import {CreateRunDialog} from './RunDialogs';
 import './top.css';
 import './topEnhancements.css';
 
-type Page='schema'|'operations'|'requests'|'history';
+type Page='schema'|'operations'|'requests'|'tests'|'history';
 type Props={gitlabManaged:boolean;gitlabChecking:boolean;onGitlab:(ref:string,name?:string)=>Promise<GitlabPipeline|null>;showSummary?:boolean;intent:WorkspaceIntent|null;onAction:(action:WorkspaceAction)=>void;onCloseAction:()=>void;auth:ReturnType<typeof useAuth>;catalog:ReturnType<typeof useServiceCatalog>;serviceId:string;snapshots:(SnapshotOption & {types?:unknown[]})[];snapshot:SnapshotOption|null;snapshotStatus?:string;apiRun:RunOut|null;onCreateRun:(name:string)=>Promise<RunOut|null>;onFinishRun:()=>void;backendStats?:RunStats;statsLoading:boolean;summaryErrors:string[];onRefresh:()=>void;onRefreshSummary:()=>void;coverage:{totalFields:number;coveredFields:number;coveragePercent:number}|null;schemaFieldCount:number|null;page:Page;onService:(id:string)=>void;onCreateService:(input:ServiceCreate)=>Promise<void>;onEditService:(id:string,input:ServiceUpdate)=>Promise<void>;onSnapshot:(id:string)=>void;onImport:(input:SnapshotImport)=>Promise<void>;onRenameSnapshot:(name:string|null)=>Promise<void>;snapshotDisplayName?:string|null;onPage:(page:Page)=>void;onMetric:(key:string)=>void;onAdmin:()=>void;adminOpen:boolean;canFinish:boolean;coverageRefreshing:boolean;contextRefreshing:boolean};
-const tabs:{id:Page;label:string}[]=[{id:'schema',label:'Схема и покрытие'},{id:'operations',label:'Операции'},{id:'requests',label:'Обращения'}];
+export const analyticsTabs:{id:Page;label:string}[]=[{id:'schema',label:'Схема и покрытие'},{id:'operations',label:'Операции'},{id:'requests',label:'Обращения'},{id:'tests',label:'Тесты'}];
 const date=(value:string|null)=>value?new Date(value).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'}):'—';
 export function TopChrome(p:Props){
  const {snapshot,coverage,intent}=p;const service=p.catalog.services.find(item=>item.id===p.serviceId)??null;
@@ -73,7 +73,7 @@ export function TopChrome(p:Props){
   {service&&runActivity&&p.canFinish&&
    <button type="button" className="run-control run-control-finish" onClick={p.onFinishRun}>Завершить прогон</button>}
   {service&&<button type="button" className="run-control" onClick={p.onRefresh} disabled={p.statsLoading||p.coverageRefreshing||p.contextRefreshing}>Обновить</button>}
- </div></div></section><nav className="top-nav" aria-label="Разделы аналитики">{tabs.map(tab=><button key={tab.id} id={`analytics-section-${tab.id}`} type="button" className={p.page===tab.id?'active':''} aria-current={p.page===tab.id?'page':undefined} onClick={()=>p.onPage(tab.id)}>{tab.label}</button>)}</nav>{p.showSummary!==false&&<AnalyticsSummary coverage={coverage} schemaFieldCount={p.schemaFieldCount} stats={p.backendStats}
+ </div></div></section><nav className="top-nav" aria-label="Разделы аналитики">{analyticsTabs.map(tab=><button key={tab.id} id={`analytics-section-${tab.id}`} type="button" className={p.page===tab.id?'active':''} aria-current={p.page===tab.id?'page':undefined} onClick={()=>p.onPage(tab.id)}>{tab.label}</button>)}</nav>{p.showSummary!==false&&<AnalyticsSummary coverage={coverage} schemaFieldCount={p.schemaFieldCount} stats={p.backendStats}
   selected={Boolean(currentRun)} refresh={p.apiRun?p.onRefreshSummary:undefined} loading={p.statsLoading||p.coverageRefreshing}
   errors={p.summaryErrors} onMetric={p.onMetric}/>}</>}{intent?.outcome==='create-service'&&<CreateServiceDialog onCreate={p.onCreateService} onClose={p.onCloseAction}/>}
  {edited&&<CreateServiceDialog key={edited.id} onCreate={p.onCreateService} edit={{service:edited,role,hasSelectedActiveRun:p.apiRun?.status==='running',onUpdate:input=>p.onEditService(edited.id,input)}} onClose={()=>setEditing(null)}/>}
