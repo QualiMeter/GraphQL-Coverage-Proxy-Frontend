@@ -33,7 +33,7 @@ describe('backend run lifecycle', () => {
     vi.stubGlobal('fetch', fetch);
     const {signal} = new AbortController();
     const page = await listRuns({serviceId}, 50, signal);
-    expect(page).toEqual({runs: [{...completed, status: 'failed'}], hasMore: true});
+    expect(page).toEqual({runs: [{...completed, status: 'failed'}], hasMore: true,total:52});
     expect(runStatus(page.runs[0].status)).toBe('Ошибка');
     expect(fetch).toHaveBeenCalledExactlyOnceWith(`/api/runs?limit=50&offset=50&serviceId=${serviceId}`, expect.objectContaining({signal}));
   });

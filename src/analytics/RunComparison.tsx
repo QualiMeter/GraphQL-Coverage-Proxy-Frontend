@@ -1,12 +1,16 @@
 import {useState} from 'react';
 import {compareRuns,type RunComparisonRequest,type RunComparisonResponse,type ComparedFieldOut,type RunMetricOut} from '../api/runComparison';
-import {listRuns,type RunOut} from '../api/runs';
+import type {RunOut,RunQuery} from '../api/runs';
+import {readHistoryPage} from '../api/gitlabHistory';
+import {RunCiInfo} from './RunCiInfo';
+import {RunHistoryFilters,type CiListContext} from './RunHistoryFilters';
+import './gitlabHistory.css';
 import type {Session} from '../api/auth';
 import type {SnapshotOption} from './backendSchema';
 import {chronological,selectionError} from './comparisonModel';
 import {useComparisonResource} from './useComparisonResource';
 import {ComparisonInvestigation} from './ComparisonInvestigation';
-import {millis} from './runAnalyticsModel';
+import {analyticsError,millis} from './runAnalyticsModel';
 import {ComparisonStatus,ComparisonPagination} from './ComparisonUi';
 import './comparison.css';
 import {useComparisonExport} from './ExportWorkspace';
@@ -17,15 +21,16 @@ type Tab='Обзор'|'Поля'|'Типы'|'Исследование';
 const date=(s:string)=>new Date(s).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'});
 const percent=(v:number)=>`${v.toLocaleString('ru-RU',{maximumFractionDigits:2})}%`;
 export const signed=(n:number|null|undefined)=>n==null?'—':`${n>0?'+':''}${n.toLocaleString('ru-RU',{maximumFractionDigits:2})}`;
-export function RunComparison({snapshots,initialSnapshotId,session,onBack}:{snapshots:SnapshotOption[];initialSnapshotId:string|null;session:Session|null;onBack:()=>void}){
+export function RunComparison({snapshots,initialSnapshotId,session,onBack,initialFilters}:{initialFilters?:CiListContext;snapshots:SnapshotOption[];initialSnapshotId:string|null;session:Session|null;onBack:()=>void}){
  const [snapshotId,setSnapshotId]=useState(initialSnapshotId??snapshots[0]?.id??'');
  const selected=snapshots.find(s=>s.id===snapshotId)??snapshots[0];
- return <section className="run-comparison" aria-label="Сравнение прогонов"><header className="comparison-heading"><div><button type="button" onClick={onBack}>← История прогонов</button><h1>Сравнение прогонов</h1></div><label>Снимок схемы<select value={selected?.id??''} onChange={e=>setSnapshotId(e.target.value)}>{snapshots.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label></header>{selected?<SnapshotComparison key={selected.id} snapshotId={selected.id} session={session}/>:<p>Нет доступных снимков схемы.</p>}</section>;
+ return <section className="run-comparison" aria-label="Сравнение прогонов"><header className="comparison-heading"><div><button type="button" onClick={onBack}>← История прогонов</button><h1>Сравнение прогонов</h1></div><label>Снимок схемы<select value={selected?.id??''} onChange={e=>setSnapshotId(e.target.value)}>{snapshots.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label></header>{selected?<SnapshotComparison key={selected.id} snapshotId={selected.id} session={session} initialFilters={initialFilters}/>:<p>Нет доступных снимков схемы.</p>}</section>;
 }
-function SnapshotComparison({snapshotId,session}:{snapshotId:string;session:Session|null}){
+function SnapshotComparison({snapshotId,session,initialFilters}:{snapshotId:string;session:Session|null;initialFilters?:CiListContext}){
  const [offset,setOffset]=useState(0),[loaded,setLoaded]=useState<RunOut[]>([]),[chosen,setChosen]=useState<RunOut[]|null>(null);
- const runs=useComparisonResource(JSON.stringify([snapshotId,offset]),signal=>listRuns({snapshotId},offset,signal,{status:'completed'}));
- const available=[...new Map([...loaded,...(runs.data?.runs??[])].filter(r=>r.status==='completed').map(r=>[r.id,r])).values()];
+ const [candidateQuery,setCandidateQuery]=useState<RunQuery>(session?{branch:initialFilters?.branch,environment:initialFilters?.environment}:{});
+ const runs=useComparisonResource(JSON.stringify([snapshotId,offset,candidateQuery]),signal=>readHistoryPage({snapshotId},offset,signal,{...candidateQuery,status:'completed'}));
+ const available=[...new Map([...loaded,...(runs.data?.page.runs??[])].filter(r=>r.status==='completed'&&r.snapshotId===snapshotId).map(r=>[r.id,r])).values()];
  const selection=chosen??chronological(available.slice(0,2));
  const [baseline,setBaseline]=useState(''),[target,setTarget]=useState('');
  const base=selection.some(r=>r.id===baseline)?baseline:selection[0]?.id??'';
@@ -52,19 +57,20 @@ function SnapshotComparison({snapshotId,session}:{snapshotId:string;session:Sess
  useComparisonExport(exportReady?{request:request!,snapshotId,names:data!.runs.map(run=>run.name)}:null);
  return <>
   <details className="comparison-card" open><summary>Выбор прогонов · {selection.length} из 20</summary><p>Только завершённые прогоны одного снимка. Backend дополнительно проверит полноту GitLab-сбора.</p>
-   <ComparisonStatus resource={runs}/>
-   <div className="comparison-run-picker">{available.map(run=><label key={run.id}><input type="checkbox" checked={selection.some(r=>r.id===run.id)} disabled={selection.length>=20&&!selection.some(r=>r.id===run.id)} onChange={e=>{setChosen(chronological(e.target.checked?[...selection,run]:selection.filter(r=>r.id!==run.id)));invalidate()}}/><span>{run.name}<small>{date(run.startedAt)} · Завершён</small></span></label>)}</div>
-   {runs.data?.hasMore&&<button type="button" onClick={()=>{setLoaded(available);setOffset(offset+50)}}>Загрузить ещё прогоны</button>}
-   {runs.data&&!available.length&&<p>Нет завершённых прогонов этого снимка.</p>}
+   <RunHistoryFilters compact query={candidateQuery} signedIn={Boolean(session)} onApply={next=>{setChosen(selection);setLoaded([]);setOffset(0);setCandidateQuery(next)}}/>
+   <ComparisonStatus resource={runs}/>{runs.data?.ciError&&<p className="ci-history-notice" role="alert">CI-фильтры не применены. {analyticsError(runs.data.ciError)} Показаны завершённые прогоны снимка без CI-фильтров. Выбранные прогоны сохранены.</p>}
+   <div className="comparison-run-picker">{available.map(run=><label key={run.id}><input type="checkbox" checked={selection.some(r=>r.id===run.id)} disabled={selection.length>=20&&!selection.some(r=>r.id===run.id)} onChange={e=>{setChosen(chronological(e.target.checked?[...selection,run]:selection.filter(r=>r.id!==run.id)));invalidate()}}/><span>{run.name}<small>{date(run.startedAt)} · Завершён</small><RunCiInfo ci={run.ci}/></span></label>)}</div>
+   {runs.data?.page.hasMore&&<button type="button" onClick={()=>{setLoaded(available);setOffset(offset+50)}}>Загрузить ещё прогоны</button>}
+   {runs.data&&!available.length&&<p>Нет завершённых прогонов по выбранным фильтрам этого снимка.</p>}
    <div className="comparison-controls"><label>Baseline<select value={base} onChange={e=>{setBaseline(e.target.value);invalidate()}}>{selection.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Target<select value={end} onChange={e=>{setTarget(e.target.value);invalidate()}}>{selection.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><button type="button" className="run-control run-control-primary" disabled={Boolean(error)||result.loading} onClick={()=>submit()}>Сравнить</button></div>
-   <ol className="comparison-sequence">{chronological(selection).map(r=><li key={r.id}>{r.name} <button aria-label={`Убрать ${r.name}`} type="button" onClick={()=>{setChosen(selection.filter(s=>s.id!==r.id));invalidate()}}>×</button></li>)}</ol>
+   <ol className="comparison-sequence">{chronological(selection).map(r=><li key={r.id}>{r.name}<RunCiInfo ci={r.ci}/> <button aria-label={`Убрать ${r.name}`} type="button" onClick={()=>{setChosen(selection.filter(s=>s.id!==r.id));invalidate()}}>×</button></li>)}</ol>
    {error&&<p role="status">{error}</p>}
   </details>
   <nav className="comparison-tabs" aria-label="Разделы сравнения">{(['Обзор','Поля','Типы','Исследование'] as Tab[]).map(t=><button key={t} type="button" aria-current={tab===t?'page':undefined} onClick={()=>setTab(t)}>{t}</button>)}</nav>
   <ComparisonStatus resource={result}/>
   {!request&&<p className="comparison-card">Выберите прогоны и нажмите «Сравнить».</p>}
-  {data&&<><ol className="comparison-sequence" aria-label="Порядок прогонов backend">{data.runs.map((r,i)=><li key={r.runId}>{i+1}. {r.name}</li>)}</ol>
-   {tab==='Обзор'&&<Overview data={data}/>}
+  {data&&<><ol className="comparison-sequence" aria-label="Порядок прогонов backend">{data.runs.map((r,i)=><li key={r.runId}>{i+1}. {r.name}<RunCiInfo ci={selection.find(run=>run.id===r.runId)?.ci}/></li>)}</ol>
+   {tab==='Обзор'&&<><div className="comparison-ci-context comparison-card"><div><strong>Baseline: {selection.find(run=>run.id===data.baselineRunId)?.name}</strong><RunCiInfo ci={selection.find(run=>run.id===data.baselineRunId)?.ci}/></div><div><strong>Target: {selection.find(run=>run.id===data.targetRunId)?.name}</strong><RunCiInfo ci={selection.find(run=>run.id===data.targetRunId)?.ci}/></div></div><Overview data={data}/></>}
    {tab==='Поля'&&<section className="comparison-card"><div className="comparison-controls"><h2>Поля</h2><label>Категория<select value={filter} onChange={e=>{const next=e.target.value as Filter;setFilter(next);submit(0,request?.types?.offset??0,next)}}>{Object.entries(fieldFilters).map(([key,label])=><option key={key} value={key}>{label}{data.fieldCategories[key]!==undefined?` (${data.fieldCategories[key]})`:''}</option>)}</select></label>{typeFocus&&<button type="button" onClick={()=>setTypeFocus('')}>Тип {typeFocus} ×</button>}</div>
     {typeFocus&&<p>Поля типа {typeFocus} на текущей странице. API сравнения не поддерживает фильтр типа; используйте пагинацию общего списка.</p>}
     <div className="table-scroll"><table><thead><tr><th>Тип / поле</th><th>Hits baseline → target</th><th>Изменение</th><th>Частота</th><th>Переходы</th><th>Устойчивость</th></tr></thead><tbody>{data.fields.items.filter(f=>!typeFocus||f.typeName===typeFocus).map(f=><tr key={`${f.typeName}.${f.fieldName}`} className={f.baselineToTarget==='noLongerCovered'?'comparison-loss':undefined}><td><button type="button" onClick={()=>investigate(f)}>{f.typeName}.{f.fieldName}</button><details><summary>История покрытия</summary><FieldTimeline field={f} runs={data.runs} onPair={(a,b)=>investigate(f,a,b)}/></details></td><td>{f.hitsByRun.find(h=>h.runId===data.baselineRunId)?.hits} → {f.hitsByRun.find(h=>h.runId===data.targetRunId)?.hits}</td><td>{fieldFilters[f.baselineToTarget]}</td><td>{f.coveredRunCount}/{data.runs.length} · {percent(f.coverageFrequencyPercent)}</td><td>{f.coverageTransitions}</td><td>{fieldFilters[f.stability]}</td></tr>)}</tbody></table></div>
