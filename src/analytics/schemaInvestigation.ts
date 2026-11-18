@@ -1,5 +1,5 @@
 import {Kind,parse,print} from 'graphql';
-import {relationId, type GraphType} from '../model';
+import {fieldId,relationId, type GraphType} from '../model';
 
 export type Relation={id:string;source:string;field:string;target:string;covered?:boolean};
 export type NestedRelation={first:Relation;second:Relation};
@@ -9,6 +9,26 @@ export type InvestigationStep=SchemaSelection&{edgeId:string|null;tab:'Обзо�
 export type InvestigationHistory={entries:InvestigationStep[];index:number};
 export const emptyHistory:InvestigationHistory={entries:[],index:-1};
 export const currentStep=(history:InvestigationHistory)=>history.entries[history.index]??null;
+export function isQueryMutationRoot(type:GraphType){
+ return type.kind==='OBJECT'&&(type.rootOperations?.some(role=>role==='query'||role==='mutation')||type.role==='query'||type.role==='mutation');
+}
+export function needsSchemaDetailSdl(step:InvestigationStep|null,types:GraphType[]){
+ if(!step)return false;
+ if(step.kind==='type')return step.tab==='SDL';
+ const type=types.find(type=>type.name===step.id.slice(0,step.id.indexOf('.')));
+ return Boolean(type&&isQueryMutationRoot(type)&&(step.tab==='SDL'||type.fields.find(field=>fieldId(type.name,field.name)===step.id)?.args===undefined));
+}
+export function fieldSdl(snapshot:{sdl:string}|null,typeName:string,fieldName:string){
+ if(!snapshot?.sdl)return null;
+ try{
+  const definitions=parse(snapshot.sdl).definitions.flatMap(definition=>{
+   if((definition.kind!==Kind.OBJECT_TYPE_DEFINITION&&definition.kind!==Kind.OBJECT_TYPE_EXTENSION)||definition.name.value!==typeName)return [];
+   const fields=definition.fields?.filter(field=>field.name.value===fieldName)??[];
+   return fields.length?[{...definition,fields}]:[];
+  });
+  return definitions.length?definitions.map(definition=>print(definition)).join('\n\n'):null;
+ }catch{return null}
+}
 export function pushStep(history:InvestigationHistory,step:InvestigationStep):InvestigationHistory{
  const current=currentStep(history);
  if(current?.kind===step.kind&&current.id===step.id&&current.edgeId===step.edgeId)return history;
@@ -33,18 +53,18 @@ export function nestedRelations(typeName:string,relations:Relation[]):NestedRela
  }
  return result;
 }
-export function sdlMetadata(snapshot:{sdl:string}|null,typeName:string,fieldName?:string){
+export function sdlMetadata(snapshot:{sdl:string}|null,typeName:string,fieldName?:string,includeExtensions=false){
  if(!snapshot?.sdl)return {definition:null,description:null,args:[] as string[],deprecationReason:null};
  try{
   const doc=parse(snapshot.sdl);
   const definitions=doc.definitions.filter(definition=>
    'name' in definition && definition.name?.value===typeName && (
-    definition.kind===Kind.OBJECT_TYPE_DEFINITION || definition.kind===Kind.INTERFACE_TYPE_DEFINITION ||
+    definition.kind===Kind.OBJECT_TYPE_DEFINITION || (includeExtensions&&definition.kind===Kind.OBJECT_TYPE_EXTENSION) || definition.kind===Kind.INTERFACE_TYPE_DEFINITION ||
     definition.kind===Kind.UNION_TYPE_DEFINITION || definition.kind===Kind.ENUM_TYPE_DEFINITION ||
     definition.kind===Kind.SCALAR_TYPE_DEFINITION || definition.kind===Kind.INPUT_OBJECT_TYPE_DEFINITION
    ));
   const field=definitions.flatMap(definition=>
-   definition.kind===Kind.OBJECT_TYPE_DEFINITION || definition.kind===Kind.INTERFACE_TYPE_DEFINITION
+   definition.kind===Kind.OBJECT_TYPE_DEFINITION || (includeExtensions&&definition.kind===Kind.OBJECT_TYPE_EXTENSION) || definition.kind===Kind.INTERFACE_TYPE_DEFINITION
     ? definition.fields ?? [] : []).find(item=>item.name.value===fieldName);
   const deprecated=field?.directives?.find(directive=>directive.name.value==='deprecated');
   const reason=deprecated?.arguments?.find(arg=>arg.name.value==='reason')?.value;

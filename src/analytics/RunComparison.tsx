@@ -9,6 +9,7 @@ import {ComparisonInvestigation} from './ComparisonInvestigation';
 import {millis} from './runAnalyticsModel';
 import {ComparisonStatus,ComparisonPagination} from './ComparisonUi';
 import './comparison.css';
+import {useComparisonExport} from './ExportWorkspace';
 
 export const fieldFilters={all:'Все поля',changed:'Изменили покрытие',newlyCovered:'Получили покрытие',noLongerCovered:'Потеряли покрытие',stillCovered:'Сохранили покрытие',stillUncovered:'Остались без покрытия',alwaysCovered:'Всегда покрыты',neverCovered:'Никогда не покрыты',intermittentlyCovered:'Нестабильное покрытие'};
 type Filter=keyof typeof fieldFilters;
@@ -47,6 +48,8 @@ function SnapshotComparison({snapshotId,session}:{snapshotId:string;session:Sess
  }
  function investigate(f:ComparedFieldOut,a=base,b=end){setField(f);setPair([a,b]);setTab('Исследование')}
  const data=result.data;
+ const exportReady=Boolean(data&&request&&!error&&request.baselineRunId===base&&request.targetRunId===end&&request.runIds.length===selection.length&&selection.every(run=>request.runIds.includes(run.id)));
+ useComparisonExport(exportReady?{request:request!,snapshotId,names:data!.runs.map(run=>run.name)}:null);
  return <>
   <details className="comparison-card" open><summary>Выбор прогонов · {selection.length} из 20</summary><p>Только завершённые прогоны одного снимка. Backend дополнительно проверит полноту GitLab-сбора.</p>
    <ComparisonStatus resource={runs}/>

@@ -147,6 +147,8 @@ export type FieldEvidenceOut = {
 };
 
 export type ExecutionOut = {
+  teamKey?: string | null;
+  suiteKey?: string | null;
   id: string;
   runId: string;
   testId: string;

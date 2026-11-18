@@ -8,6 +8,7 @@ export type OperationOut = {
   fields: {typeName: string; fieldName: string; hits: number}[];
 };
 export type RequestOut = {
+  testExecutionId?: string | null;
   id: string; runId: string; operationName: string | null; operationType: string | null; operationKey?: string | null;
   httpMethod: string; httpStatus: number | null; analysisStatus: string; responseHasData: boolean | null;
   graphqlHasErrors: boolean | null; durationMs: number | null; errorCode: string | null; createdAt: string;
@@ -37,6 +38,7 @@ function requestRow(v: unknown, runId: string): v is RequestOut {
   return object(v) && v.runId === runId && strings(v, 'id', 'httpMethod', 'analysisStatus') && date(v.createdAt) &&
     ['operationName', 'operationType', 'errorCode'].every(key => nullable(v[key], 'string')) &&
     (v.operationKey === undefined || nullable(v.operationKey, 'string')) &&
+    (v.testExecutionId === undefined || nullable(v.testExecutionId, 'string')) &&
     ['httpStatus', 'durationMs'].every(key => nullable(v[key], 'number')) &&
     ['responseHasData', 'graphqlHasErrors'].every(key => nullable(v[key], 'boolean'));
 }
@@ -68,7 +70,7 @@ export function getRunStats(runId: string, signal?: AbortSignal) {
 }
 
 export type JournalQuery = {
-  operationName?: string; operationKey?: string; operationType?: string;
+  testExecutionId?: string; operationName?: string; operationKey?: string; operationType?: string;
   typeName?: string; fieldName?: string; graphqlHasErrors?: boolean; httpStatusClass?: number; httpStatus?: number;
   analysisStatus?: string; from?: string; to?: string; sortBy: 'createdAt' | 'durationMs'; sortOrder?: 'asc' | 'desc';
 };
