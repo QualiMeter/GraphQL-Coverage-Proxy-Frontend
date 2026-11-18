@@ -11,6 +11,8 @@ import {RequestPathContext} from './RequestPathContext';
 import './requestPaths.css';
 import {RelatedExecution} from './RelatedTestExecutions';
 import {RequestFieldEvidence} from './RequestFieldEvidence';
+import {useExportFilterState,usePublishExport} from './ExportWorkspace';
+import {operationExportFilters,requestExportFilters} from './exportFilters';
 
 type Props = {
   testExecutionId?:string;onTest?:(id:string)=>void;onClearTest?:()=>void;
@@ -43,13 +45,15 @@ function Stats({stats}:{stats:RunStats}) {
 }
 
 export function BackendOperations(p:Props) {
-  const [search,setSearch]=useState('');
-  const [kind,setKind]=useState('');
-  const [errors,setErrors]=useState(false);
-  const [order,setOrder]=useState('count');
+  const reset=JSON.stringify([p.field,p.operationKey]);
+  const [search,setSearch]=useExportFilterState('operations','search','',reset);
+  const [kind,setKind]=useExportFilterState('operations','kind','',reset);
+  const [errors,setErrors]=useExportFilterState('operations','errors',false,reset);
+  const [order,setOrder]=useExportFilterState('operations','order','count',reset);
   const [selection,setSelection]=useState(p.operationKey);
   const load=useCallback((signal:AbortSignal)=>getOperations(p.runId,signal),[p.runId]);
   const result=useBackendRead(JSON.stringify([p.scope,p.revision]),load);
+  usePublishExport('operations',operationExportFilters(search,kind,p.field,errors,order));
   const selected=result.data?.find(op=>op.operationKey===selection);
   const visible=result.data?.filter(op=>matchesOperation(op,search,kind,p.field,errors)).sort((a,b)=>
     order==='duration'?(b.avgDurationMs??-1)-(a.avgDurationMs??-1):
@@ -89,16 +93,17 @@ function KindSelect({value,onChange}:{value:string;onChange:(value:string)=>void
 function DetailHead({onClose}:{onClose:()=>void}) {return <div className="detail-head"><strong>Подробности</strong><button aria-label="Закрыть подробности" onClick={onClose}>×</button></div>}
 
 export function BackendRequests(p:Props) {
-  const [search,setSearch]=useState('');
-  const [name,setName]=useState<string>();
-  const [kind,setKind]=useState('');
-  const [filter,setFilter]=useState(p.filter);
-  const [order,setOrder]=useState(p.sort==='duration'?'durationMs':'createdAt');
-  const [field,setField]=useState(p.field);
-  const [direction,setDirection]=useState<"asc"|"desc">("desc");
-  const [httpCode,setHttpCode]=useState('');
-  const [from,setFrom]=useState("");
-  const [to,setTo]=useState("");
+  const reset=JSON.stringify([p.field,p.operationKey,p.testExecutionId,p.filter,p.sort]);
+  const [search,setSearch]=useExportFilterState('requests','search','',reset);
+  const [name,setName]=useExportFilterState<string|undefined>('requests','name',undefined,reset);
+  const [kind,setKind]=useExportFilterState('requests','kind','',reset);
+  const [filter,setFilter]=useExportFilterState('requests','filter',p.filter,reset);
+  const [order,setOrder]=useExportFilterState('requests','order',p.sort==='duration'?'durationMs':'createdAt',reset);
+  const [field,setField]=useExportFilterState('requests','field',p.field,reset);
+  const [direction,setDirection]=useExportFilterState<'asc'|'desc'>('requests','direction','desc',reset);
+  const [httpCode,setHttpCode]=useExportFilterState('requests','httpCode','',reset);
+  const [from,setFrom]=useExportFilterState('requests','from',"",reset);
+  const [to,setTo]=useExportFilterState('requests','to',"",reset);
   const [offset,setOffset]=useState(0);
   const [selection,setSelection]=useState('');
   const allowed=mayReadJournal(p.role);
@@ -111,6 +116,7 @@ export function BackendRequests(p:Props) {
     httpStatus:httpCode?Number(httpCode):undefined,graphqlHasErrors:filter==='graphql'?true:undefined,httpStatusClass:filter==='http4'?4:filter==='http5'?5:undefined,
     analysisStatus:filter in analysisLabels?filter:undefined}),[name,p.testExecutionId,p.operationKey,kind,typeName,fieldName,order,filter,direction,from,to,httpCode]);
   const group=filter==='http'||filter==='analyzer'?filter:'';
+  usePublishExport('requests',requestExportFilters(query,group),pathActive?['Локальный AST-фильтр пути не применяется к экспорту обращений. Остальные серверные фильтры сохраняются.']:[]);
   const load=useCallback((signal:AbortSignal)=>getFilteredJournal(p.runId,query,offset,group,signal),[p.runId,query,offset,group]);
   const validInterval=!from||!to||from<to;
   const validHttpCode=!httpCode||/^[1-5]\d{2}$/.test(httpCode);

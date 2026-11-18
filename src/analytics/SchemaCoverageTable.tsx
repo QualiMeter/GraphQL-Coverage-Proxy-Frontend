@@ -6,6 +6,8 @@ import {
   type AdvancedFilters, type CoverageFilter, type CoverageSort,
 } from './coverageTableFilters';
 import './schemaCoverageTable.css';
+import {useExportFilterState,usePublishExport} from './ExportWorkspace';
+import {coverageExportFilters} from './exportFilters';
 
 const advancedControls = [
   {key: 'hits', label: 'Hits', options: [
@@ -41,8 +43,8 @@ export function SchemaCoverageTable({
   types, coverageAvailable = true, sdl, query, filter, sort, selectedField, onQuery, onFilter, onSort, onField,
 }: Props) {
   const advancedId = useId();
-  const [type, setType] = useState('');
-  const [advanced, setAdvanced] = useState(defaultAdvancedFilters);
+  const [type, setType] = useExportFilterState('coverage','type','');
+  const [advanced, setAdvanced] = useExportFilterState('coverage','advanced',defaultAdvancedFilters);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const fields = useMemo(() => coverageRows(types, sdl), [types, sdl]);
   const typeOptions = useMemo(() => [
@@ -53,6 +55,7 @@ export function SchemaCoverageTable({
   const order = sort === 'type-field' || coverageAvailable && (sort === 'hits-asc' || sort === 'hits') ? sort : 'date';
   const hasDeprecated = fields.some(({field}) => typeof field.deprecated === 'boolean');
   const controls = advancedControls.filter(control => (control.key !== 'deprecated' || hasDeprecated) && (control.key !== 'hits' || coverageAvailable));
+  usePublishExport('coverage',coverageExportFilters(query,coverageAvailable?filter:'all',order,type,{...advanced,hits:coverageAvailable?advanced.hits:'all',deprecated:hasDeprecated?advanced.deprecated:'all'}));
   const activeAdvanced = controls.filter(control => advanced[control.key] !== 'all');
   const visibleFields = useMemo(() => filterCoverageRows(fields, {
     ...advanced, hits: coverageAvailable ? advanced.hits : 'all', deprecated: hasDeprecated ? advanced.deprecated : 'all',
