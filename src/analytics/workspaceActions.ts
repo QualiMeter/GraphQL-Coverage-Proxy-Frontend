@@ -9,9 +9,7 @@ export const workspaceActionCopy = {
   run: {title: 'Новый прогон', login: 'Войдите, чтобы начать новый прогон.'},
 } satisfies Record<WorkspaceAction, {title: string; login: string}>;
 
-export function workspaceActionFor(action: WorkspaceAction, session: Session | null, mockSelected: boolean) {
-  if (mockSelected && action === 'snapshot') return 'local-snapshot';
-  if (mockSelected && action === 'run') return 'local-run';
+export function workspaceActionFor(action: WorkspaceAction, session: Session | null) {
   if (!session?.user.isActive || Date.parse(session.expiresAt) <= Date.now()) return 'login';
   if (!canCreateService(session)) return 'denied';
   if (action === 'service') return 'create-service';

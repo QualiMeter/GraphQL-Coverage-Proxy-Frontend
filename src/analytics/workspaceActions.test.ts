@@ -12,26 +12,22 @@ function session(role: Role): Session {
 }
 
 describe('workspace action routing', () => {
-  it('opens login for each anonymous backend action', () => {
-    expect(actions.map(action => workspaceActionFor(action, null, false))).toEqual(['login', 'login', 'login']);
+  it('opens login for each anonymous action', () => {
+    expect(actions.map(action => workspaceActionFor(action, null))).toEqual(['login', 'login', 'login']);
   });
 
-  it.each(['viewer', 'analyst'] as const)('explains permissions for %s and does not ask for another login', role => {
-    expect(actions.map(action => workspaceActionFor(action, session(role), false))).toEqual(['denied', 'denied', 'denied']);
+  it.each(['viewer', 'analyst'] as const)('explains permissions for %s without requesting another login', role => {
+    expect(actions.map(action => workspaceActionFor(action, session(role)))).toEqual(['denied', 'denied', 'denied']);
   });
 
-  it.each(['operator', 'admin'] as const)('offers backend actions for %s', role => {
-    expect(actions.map(action => workspaceActionFor(action, session(role), false))).toEqual([
+  it.each(['operator', 'admin'] as const)('routes authorized %s actions to the backend', role => {
+    expect(actions.map(action => workspaceActionFor(action, session(role)))).toEqual([
       'create-service', 'remote-snapshot', 'create-run',
     ]);
   });
 
-  it('preserves anonymous mock actions and still requires login to create a real service', () => {
-    expect(actions.map(action => workspaceActionFor(action, null, true))).toEqual(['login', 'local-snapshot', 'local-run']);
-  });
-
   it('routes expired sessions to login', () => {
     const expired = {...session('operator'), expiresAt: new Date(0).toISOString()};
-    expect(actions.map(action => workspaceActionFor(action, expired, false))).toEqual(['login', 'login', 'login']);
+    expect(actions.map(action => workspaceActionFor(action, expired))).toEqual(['login', 'login', 'login']);
   });
 });
