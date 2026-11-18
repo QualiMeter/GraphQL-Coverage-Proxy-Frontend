@@ -1,4 +1,5 @@
 import {requestJson} from './client';
+import {validGraphqlErrors,type GraphqlErrorInfo} from './graphqlErrors';
 
 export type OperationType = 'query' | 'mutation' | 'subscription';
 export type OperationOut = {
@@ -13,7 +14,7 @@ export type RequestOut = {
   httpMethod: string; httpStatus: number | null; analysisStatus: string; responseHasData: boolean | null;
   graphqlHasErrors: boolean | null; durationMs: number | null; errorCode: string | null; createdAt: string;
 };
-export type RequestDetail = RequestOut & {
+export type RequestDetail = RequestOut & GraphqlErrorInfo & {
   countedInCoverage: boolean; selectedFields: {typeName: string; fieldName: string; returnType: string | null}[];
   safeGraphqlDocument?: string | null; documentAvailability?: 'available' | 'redacted' | 'unavailable';
 };
@@ -96,7 +97,7 @@ export function getRequestDetail(runId: string, requestId: string, signal?: Abor
       !('selectedFields' in data) || !Array.isArray(data.selectedFields) ||
       !data.selectedFields.every(v => field(v) && nullable(v.returnType, 'string')) ||
       ('safeGraphqlDocument' in data && !nullable(data.safeGraphqlDocument, 'string')) ||
-      ('documentAvailability' in data && !['available','redacted','unavailable'].includes(String(data.documentAvailability)))) {
+      ('documentAvailability' in data && !['available','redacted','unavailable'].includes(String(data.documentAvailability))) || !validGraphqlErrors(data)) {
       throw new Error('Expected RequestDetailOut');
     }
     return data as RequestDetail;

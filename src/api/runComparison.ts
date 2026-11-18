@@ -1,4 +1,5 @@
 import {requestJson} from './client';
+import {validGraphqlErrors} from './graphqlErrors';
 import {comparisonSchemas} from './comparisonSchemas';
 import type {RunComparisonRequest,RunComparisonResponse,FieldEvidencePage,ExecutionOut,ExecutionFieldOut,RequestDetailOut} from './comparisonDtos';
 export type {RunComparisonRequest,RunComparisonResponse,ComparedFieldOut,ComparedTypeOut,RunMetricOut,ExecutionOut,RequestDetailOut} from './comparisonDtos';
@@ -65,5 +66,5 @@ export function getTestFields(runId:string,id:string,offset:number,signal?:Abort
  return requestJson(`${path(runId)}/tests/${encodeURIComponent(id)}/fields?${params({limit:50,offset})}`,(data,response)=>page<ExecutionFieldOut>('ExecutionFieldOut',data,response,offset,()=>true),{signal});
 }
 export function getComparisonRequest(runId:string,id:string,signal?:AbortSignal){
- return requestJson(`${path(runId)}/requests/${encodeURIComponent(id)}`,data=>{const row=decode<RequestDetailOut>('RequestDetailOut',data);if(row.runId!==runId||row.id!==id)throw new Error('Request context mismatch');return row},{signal});
+ return requestJson(`${path(runId)}/requests/${encodeURIComponent(id)}`,data=>{const row=decode<RequestDetailOut>('RequestDetailOut',data);if(row.runId!==runId||row.id!==id||!validGraphqlErrors(row))throw new Error('Request context mismatch or invalid GraphQL diagnostics');return row},{signal});
 }

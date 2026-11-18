@@ -3,14 +3,12 @@ import {getFilteredJournal, getOperations, getRequestDetail, journalPageSize, ty
 import type {GraphType} from '../model';
 import {useBackendRead} from './useBackendRead';
 import {analyticsError, analysisErrors, matchesOperation, mayReadJournal, millis, operationLabel} from './runAnalyticsModel';
-import {CodeView} from './CodeView';
 import {OperationsTable} from './OperationsTable';
 import type {SchemaCoordinate} from '../api/runPaths';
 import {useRequestPathSearch} from './useRequestPathSearch';
 import {RequestPathContext} from './RequestPathContext';
 import './requestPaths.css';
-import {RelatedExecution} from './RelatedTestExecutions';
-import {RequestFieldEvidence} from './RequestFieldEvidence';
+import {RequestDetailPanel} from './RequestDetailPanel';
 import {useExportFilterState,usePublishExport} from './ExportWorkspace';
 import {operationExportFilters,requestExportFilters} from './exportFilters';
 
@@ -105,7 +103,7 @@ export function BackendRequests(p:Props) {
   const [from,setFrom]=useExportFilterState('requests','from',"",reset);
   const [to,setTo]=useExportFilterState('requests','to',"",reset);
   const [offset,setOffset]=useState(0);
-  const [selection,setSelection]=useState('');
+  const [selection,setSelection]=useState(''),[detailAttempt,setDetailAttempt]=useState(0);
   const allowed=mayReadJournal(p.role);
   const pathActive=Boolean(p.requestPath?.length);
   const pathSearch=useRequestPathSearch({runId:p.runId,snapshotId:p.snapshotId,scope:p.scope,path:p.requestPath,enabled:allowed&&pathActive});
@@ -123,7 +121,7 @@ export function BackendRequests(p:Props) {
   const result=useBackendRead(allowed&&!pathActive&&validInterval&&validHttpCode?JSON.stringify([p.scope,p.revision,query,offset,group]):null,load);
   const cachedDetail=pathActive?pathSearch.getDetail(selection):undefined;
   const loadDetail=useCallback((signal:AbortSignal)=>cachedDetail?Promise.resolve(cachedDetail):getRequestDetail(p.runId,selection,signal),[p.runId,selection,cachedDetail]);
-  const details=useBackendRead(allowed&&selection?JSON.stringify([p.scope,p.revision,selection]):null,loadDetail);
+  const details=useBackendRead(allowed&&selection?JSON.stringify([p.scope,p.runId,p.snapshotId,p.revision,selection,detailAttempt]):null,loadDetail);
   const change=(action:()=>void)=>{action();setOffset(0);setSelection('')};
   const request=details.data;
   const rows=pathActive?pathSearch.state?.rows:result.data?.rows;
@@ -165,18 +163,6 @@ export function BackendRequests(p:Props) {
           <span>Страница {offset/journalPageSize+1}</span><button disabled={!result.data?.more} onClick={()=>{setOffset(offset+journalPageSize);setSelection('')}}>Далее</button></div>}
       </>}
     </div>
-    {allowed&&selection&&<aside className="detail-panel"><DetailHead onClose={()=>setSelection('')}/>
-      {request?<><h2>{operationLabel(request.operationName)}</h2><dl>
-        <dt>Дата</dt><dd>{date(request.createdAt)}</dd><dt>HTTP</dt><dd>{request.httpMethod} {request.httpStatus??'—'}</dd><dt>GraphQL ошибки</dt><dd>{yesNo(request.graphqlHasErrors)}</dd>
-        <dt>Длительность</dt><dd>{millis(request.durationMs)}</dd><dt>Анализ</dt><dd>{analysisLabels[request.analysisStatus]??request.analysisStatus}</dd>
-        <dt>В ответе есть данные</dt><dd>{yesNo(request.responseHasData)}</dd>
-        <dt>Учтено в покрытии</dt><dd>{yesNo(request.countedInCoverage)}</dd>{request.errorCode&&<><dt>Код ошибки</dt><dd>{request.errorCode}</dd></>}
-      </dl>
-      {request.operationKey&&<button className="run-control" onClick={()=>p.onOperation(request.operationKey!)}>Открыть операцию</button>}
-      <RelatedExecution key={`${p.scope}:${request.id}:${request.testExecutionId??'none'}`} runId={p.runId} executionId={request.testExecutionId} scope={p.scope} revision={p.revision} onOpen={p.onTest}/>
-      <h3>Поля</h3><RequestFieldEvidence key={JSON.stringify([p.scope,p.runId,p.snapshotId,request.id])} request={request} snapshotId={p.snapshotId} scope={p.scope} allowed={allowed} onField={p.onField}/>
-      <h3>GraphQL-код</h3>{request.documentAvailability==='redacted'&&<p>Чувствительные значения скрыты сервером.</p>}{request.documentAvailability!=='unavailable'&&request.safeGraphqlDocument?<CodeView code={request.safeGraphqlDocument}/>:<p>Безопасный документ недоступен.</p>}
-      </>:<Result {...details} empty="Нет данных обращения."/>}
-    </aside>}
+    {allowed&&selection&&<RequestDetailPanel key={JSON.stringify([p.scope,p.runId,p.snapshotId,selection])} request={request} loading={details.loading} error={details.error} snapshotId={p.snapshotId} scope={p.scope} revision={p.revision} onClose={()=>setSelection('')} onRetry={()=>setDetailAttempt(attempt=>attempt+1)} onOperation={p.onOperation} onField={p.onField} onTest={p.onTest}/>}
   </>;
 }

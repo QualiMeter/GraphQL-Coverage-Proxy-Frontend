@@ -1,72 +1,20 @@
-import {useEffect, useState} from 'react';
-import {listRuns, runPageSize, type RunOut, type RunPage} from '../api/runs';
-import {runActionError, runStatus, snapshotForRun} from './backendRuns';
+import {Fragment,useState} from 'react';
+import {runPageSize,type RunOut,type RunQuery} from '../api/runs';
+import {readHistoryPage} from '../api/gitlabHistory';
+import {runStatus,snapshotForRun} from './backendRuns';
 import type {SnapshotOption} from './backendSchema';
-
-type Props = {
-  serviceId: string;
-  snapshots: SnapshotOption[];
-  snapshotsReady: boolean;
-  selectedId?: string;
-  onSelect: (run: RunOut) => void;
-  onCompare: () => void;
-};
-
-export function BackendRunHistory({serviceId, snapshots, snapshotsReady, selectedId, onSelect, onCompare}: Props) {
-  const [offset, setOffset] = useState(0);
-  const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{offset: number; attempt: number; page?: RunPage; error?: string}>();
-  const current = result?.offset === offset && result.attempt === attempt ? result : undefined;
-  useEffect(() => {
-    const controller = new AbortController();
-    void listRuns({serviceId}, offset, controller.signal).then(page => {
-      if (!controller.signal.aborted) setResult({offset, attempt, page});
-    }).catch(error => {
-      if (!controller.signal.aborted) setResult({offset, attempt, error: runActionError(error, 'read')});
-    });
-    return () => controller.abort();
-  }, [serviceId, offset, attempt]);
-
-  return (
-    <div className="content-panel backend-run-history">
-      <div className="run-history-toolbar">
-        <h2>Прогоны сервиса</h2>
-        <button type="button" className="run-control" onClick={onCompare}>Сравнить прогоны</button>
-        <button type="button" className="run-control" disabled={!current} onClick={() => setAttempt(value => value + 1)}>
-          {current?.error ? 'Повторить' : 'Обновить'}
-        </button>
-      </div>
-      {!current ? <div className="run-history-message" role="status">Загружаем прогоны…</div> : current.error ? (
-        <div className="run-history-message" role="alert">{current.error}</div>
-      ) : current.page && <>
-        {current.page.runs.length ? (
-          <div className="table-scroll">
-            <table className="run-history-table" aria-label="История прогонов сервиса">
-              <thead><tr><th>Прогон</th><th>Статус</th><th>Начало</th><th>Завершение</th><th>Снимок</th></tr></thead>
-              <tbody>{current.page.runs.map(run => {
-                const snapshot = snapshotForRun(run, snapshots);
-                const selected = run.id === selectedId;
-                return <tr key={run.id} className={selected ? 'selected' : undefined} onClick={snapshot ? () => onSelect(run) : undefined}>
-                  <td><button type="button" className="run-history-select" disabled={!snapshot} onClick={event => {event.stopPropagation();onSelect(run)}} aria-pressed={selected}>{run.name}</button></td>
-                  <td><span className="run-badge" data-status={run.status}>{runStatus(run.status)}</span></td>
-                  <td className="run-history-date">{formatDate(run.startedAt)}</td>
-                  <td className="run-history-date">{formatDate(run.finishedAt)}</td>
-                  <td className="run-history-snapshot">{snapshot?.name ?? (snapshotsReady ? 'Снимок недоступен' : 'Ожидаем список снимков')}</td>
-                </tr>;
-              })}</tbody>
-            </table>
-          </div>
-        ) : <div className="run-history-message">{offset ? 'На этой странице нет прогонов.' : 'У сервиса пока нет прогонов. Создайте прогон для выбранного снимка.'}</div>}
-        {(offset > 0 || current.page.hasMore) && <div className="run-history-pagination">
-          <button type="button" className="run-control" disabled={!offset} onClick={() => setOffset(value => value - runPageSize)}>Назад</button>
-          <span>Страница {Math.floor(offset / runPageSize) + 1}</span>
-          <button type="button" className="run-control" disabled={!current.page.hasMore} onClick={() => setOffset(value => value + runPageSize)}>Далее</button>
-        </div>}
-      </>}
-    </div>
-  );
+import {useComparisonResource} from './useComparisonResource';
+import {ComparisonStatus} from './ComparisonUi';
+import {RunHistoryFilters,type CiListContext} from './RunHistoryFilters';
+import {RunCiInfo} from './RunCiInfo';
+import {GitlabJobs} from './GitlabJobs';
+import {analyticsError} from './runAnalyticsModel';
+import './gitlabHistory.css';
+type Props={serviceId:string;snapshots:SnapshotOption[];snapshotsReady:boolean;selectedId?:string;onSelect:(run:RunOut)=>void;onCompare:(context?:CiListContext)=>void;signedIn?:boolean;scope?:string};
+export function BackendRunHistory({serviceId,snapshots,snapshotsReady,selectedId,onSelect,onCompare,signedIn=false,scope=''}:Props){
+ const [offset,setOffset]=useState(0),[query,setQuery]=useState<RunQuery>({sortBy:'startedAt',sortOrder:'desc'}),[openJobs,setOpenJobs]=useState<string|null>(null);
+ const resource=useComparisonResource(JSON.stringify([scope,serviceId,query,offset]),signal=>readHistoryPage({serviceId},offset,signal,query));
+ const result=resource.data,page=result?.page;
+ return <div className="content-panel backend-run-history"><div className="run-history-toolbar"><h2>Прогоны сервиса</h2><button type="button" className="run-control" onClick={()=>onCompare(result?.ciError?{}:{branch:query.branch,environment:query.environment})}>Сравнить прогоны</button><button type="button" className="run-control" disabled={resource.loading} onClick={resource.retry}>{resource.error?'Повторить':'Обновить'}</button></div><RunHistoryFilters query={query} signedIn={signedIn} onApply={next=>{setQuery(next);setOffset(0);setOpenJobs(null)}}/><ComparisonStatus resource={resource}/>{result?.ciError&&<p className="ci-history-notice" role="alert">CI-фильтры или сортировка не применены. {analyticsError(result.ciError)} Показана общая история без CI-ограничений, с сортировкой по времени. Можно сбросить фильтры или повторить чтение после проверки доступа.</p>}{page&&<><p className="history-found-count">Найдено прогонов: {page.total??'общее число недоступно'}</p>{page.runs.length?<div className="table-scroll"><table className="run-history-table" aria-label="История прогонов сервиса"><thead><tr><th>Прогон</th><th>Статус сбора</th><th>Начало</th><th>Завершение</th><th>Снимок</th><th>GitLab CI</th></tr></thead><tbody>{page.runs.map(run=>{const snapshot=snapshotForRun(run,snapshots),selected=run.id===selectedId,expanded=openJobs===run.id;return <Fragment key={run.id}><tr className={selected?'selected':undefined} onClick={snapshot?()=>onSelect(run):undefined}><td data-label="Прогон"><button type="button" className="run-history-select" disabled={!snapshot} onClick={event=>{event.stopPropagation();onSelect(run)}} aria-pressed={selected}>{run.name}</button></td><td data-label="Статус сбора"><span className="run-badge" data-status={run.status}>{runStatus(run.status)}</span></td><td data-label="Начало">{formatDate(run.startedAt)}</td><td data-label="Завершение">{formatDate(run.finishedAt)}</td><td data-label="Снимок">{snapshot?.name??(snapshotsReady?'Снимок недоступен':'Ожидаем список снимков')}</td><td data-label="GitLab CI"><RunCiInfo ci={run.ci} link/>{run.ci&&signedIn&&<div className="run-ci-actions"><button type="button" className="run-control" aria-expanded={expanded} onClick={event=>{event.stopPropagation();setOpenJobs(expanded?null:run.id)}}>{expanded?'Скрыть jobs':'Показать jobs'}</button></div>}</td></tr>{expanded&&run.ci&&signedIn&&<tr><td colSpan={6}><GitlabJobs key={JSON.stringify([scope,serviceId,run.id,run.ci.pipelineId])} scope={scope} runId={run.id} pipelineId={run.ci.pipelineId}/></td></tr>}</Fragment>})}</tbody></table></div>:<div className="run-history-message">{Object.values(query).some(value=>value!==undefined&&value!=='startedAt'&&value!=='desc')?'По выбранным фильтрам прогонов не найдено.':offset?'На этой странице нет прогонов.':'У сервиса пока нет прогонов. Создайте прогон для выбранного снимка.'}</div>}<div className="run-history-pagination"><button type="button" className="run-control" disabled={!offset} onClick={()=>{setOffset(Math.max(0,offset-runPageSize));setOpenJobs(null)}}>Назад</button><span>Страница {offset/runPageSize+1}{page.total!=null?` · Всего ${page.total}`:''}</span><button type="button" className="run-control" disabled={!page.hasMore} onClick={()=>{setOffset(offset+runPageSize);setOpenJobs(null)}}>Далее</button></div></>}</div>;
 }
-
-const formatDate = (value: string | null) => value
-  ? new Date(value).toLocaleString('ru-RU', {dateStyle: 'short', timeStyle: 'short'})
-  : '—';
+const formatDate=(value:string|null)=>value?new Date(value).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'}):'—';
