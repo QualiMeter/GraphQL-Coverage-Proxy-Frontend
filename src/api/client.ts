@@ -25,12 +25,13 @@ type RequestOptions = {
   body?: unknown;
   csrfToken?: string;
   readErrorCode?: boolean;
+  decodeError?: (data: unknown, status: number) => Error | undefined;
 };
 
 export async function requestJson<T>(
   path: `/api/${string}`,
   decode: (data: unknown, response: Response) => T,
-  {signal, method = 'GET', body, csrfToken, readErrorCode}: RequestOptions = {},
+  {signal, method = 'GET', body, csrfToken, readErrorCode, decodeError}: RequestOptions = {},
 ): Promise<T> {
   const headers = new Headers({Accept: 'application/json'});
   if (body !== undefined) headers.set('Content-Type', 'application/json');
@@ -49,8 +50,10 @@ export async function requestJson<T>(
 
   if (!response.ok) {
     let code: string | undefined;
-    if (readErrorCode) {
+    if (readErrorCode || decodeError) {
       const data: unknown = await response.json().catch(() => undefined);
+      const decoded = decodeError?.(data, response.status);
+      if (decoded) throw decoded;
       if (data && typeof data === 'object' && 'code' in data &&
           typeof data.code === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(data.code)) code = data.code;
     }

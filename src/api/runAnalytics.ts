@@ -74,14 +74,16 @@ export type JournalQuery = {
 };
 export const journalPageSize = 50;
 
-export function getJournal(runId: string, query: JournalQuery, offset: number, signal?: AbortSignal) {
-  const params = new URLSearchParams({limit: String(journalPageSize), offset: String(offset)});
+export function getJournal(runId: string, query: JournalQuery, offset: number, signal?: AbortSignal,
+  {limit=journalPageSize,includeTotal=false}:{limit?:number;includeTotal?:boolean}={}) {
+  const params = new URLSearchParams({limit: String(limit), offset: String(offset)});
   for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, String(value));
   return requestJson(`${path(runId)}/requests?${params}`, (data, response) => {
     if (!Array.isArray(data) || !data.every(item => requestRow(item, runId))) throw new Error('Expected RequestOut[]');
     const total = response.headers.get('X-Total-Count');
     return {rows: data as RequestOut[], more: total !== null && /^\d+$/.test(total)
-      ? offset + data.length < Number(total) : data.length === journalPageSize};
+      ? offset + data.length < Number(total) : data.length === limit,
+      ...(includeTotal&&total!==null&&/^\d+$/.test(total)?{total:Number(total)}:{})};
   }, {signal});
 }
 

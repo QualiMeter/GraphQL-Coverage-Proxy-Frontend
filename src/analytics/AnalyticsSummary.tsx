@@ -2,12 +2,11 @@ import {useState, type ButtonHTMLAttributes} from 'react';
 import type {RunStats} from '../api/runAnalytics';
 import {ActionTooltip} from './ActionTooltip';
 import {ContextChevron} from './ContextMenu';
-import type {RunMetrics} from './model';
 import {analysisErrors,millis} from './runAnalyticsModel';
 
 type Props = {
   coverage:{totalFields:number;coveredFields:number;coveragePercent:number}|null;
-  schemaFieldCount:number|null;metrics:RunMetrics|null;stats?:RunStats;selected:boolean;
+  schemaFieldCount:number|null;stats?:RunStats;selected:boolean;
   refresh?:()=>void;loading:boolean;errors:string[];onMetric:(key:string)=>void;
 };
 
@@ -31,11 +30,11 @@ function Metric({title,value,action,primary=false,hint}:{title:string;value:stri
 
 const percent=new Intl.NumberFormat('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
 
-export function AnalyticsSummary({coverage,schemaFieldCount,metrics,stats,selected,refresh,loading,errors,onMetric}:Props) {
+export function AnalyticsSummary({coverage,schemaFieldCount,stats,selected,refresh,loading,errors,onMetric}:Props) {
   const [collapsed,setCollapsed]=useState(()=>localStorage.getItem('coverage.summary.collapsed')==='true');
   const value=coverage?`${percent.format(coverage.coveragePercent)}%`:'—';
-  const total=stats?.totalRequests??metrics?.total??'—';
-  const measured=Boolean(metrics||stats);
+  const total=stats?.totalRequests??'—';
+  const measured=Boolean(stats);
   const metric=(title:string,value:string|number,key:string,hint?:string)=><Metric title={title} value={value}
     action={measured?()=>onMetric(key):undefined} hint={hint}/>;
   return <section className="workspace-summary" aria-label="Сводка прогона">
@@ -74,16 +73,16 @@ export function AnalyticsSummary({coverage,schemaFieldCount,metrics,stats,select
         <div className="summary-groups">
           <div className="summary-grouping"><h3>Активность</h3><div>
             {metric('Обращения',total,'requests')}
-            {metric('Уникальные операции',stats?.uniqueOperations??metrics?.uniqueOperations??'—','operations')}
+            {metric('Уникальные операции',stats?.uniqueOperations??'—','operations')}
           </div></div>
           <div className="summary-grouping"><h3>Ошибки</h3><div>
-            {metric('HTTP-ошибки',stats?.httpErrorCount??metrics?.httpErrors??'—','http')}
-            {metric('GraphQL-ошибки',stats?.graphqlErrorCount??metrics?.graphqlErrors??'—','graphql')}
-            {metric('Ошибки анализа',stats?(analysisErrors(stats)??'—'):metrics?.analyzerErrors??'—','analyzer')}
+            {metric('HTTP-ошибки',stats?.httpErrorCount??'—','http')}
+            {metric('GraphQL-ошибки',stats?.graphqlErrorCount??'—','graphql')}
+            {metric('Ошибки анализа',stats?(analysisErrors(stats)??'—'):'—','analyzer')}
           </div></div>
           <div className="summary-grouping"><h3>Время ответа</h3><div>
-            {metric('Среднее время',millis(stats?stats.avgDurationMs:metrics?.averageMs),'average')}
-            {metric('P95',millis(stats?stats.p95DurationMs:metrics?.p95Ms),'p95','95% измеренных обращений выполнялись не дольше указанного времени.')}
+            {metric('Среднее время',millis(stats?.avgDurationMs),'average')}
+            {metric('P95',millis(stats?.p95DurationMs),'p95','95% измеренных обращений выполнялись не дольше указанного времени.')}
           </div></div>
         </div>
       </section>

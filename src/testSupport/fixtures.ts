@@ -1,6 +1,6 @@
 import type {FieldRef,Operation,Store,Observation,Run} from './model';
 import {snapshotFromSDL} from './sdl';
-import {MOCK_SERVICE_ID} from './mockService';
+const MOCK_SERVICE_ID = 'mock:customer';
 export const customerSDL=`schema { query: Query mutation: Mutation }
 type Query { customer(id: ID!): Customer customers: [Customer!]! order(id: ID!): Order orders: [Order!]! products: [Product!]! search(term: String!): [SearchResult!]! }
 type Mutation { createCustomer(name: String!): Customer! createOrder(customerId: ID!): Order! updateOrder(id: ID!): Order! cancelOrder(id: ID!): Order! }

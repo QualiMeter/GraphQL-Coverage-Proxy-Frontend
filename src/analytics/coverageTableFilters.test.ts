@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {snapshotFromSDL} from './sdl';
+import {snapshotFromSDL} from '../testSupport/sdl';
 import {coverageRows, defaultAdvancedFilters, filterCoverageRows} from './coverageTableFilters';
 
 const sdl = `

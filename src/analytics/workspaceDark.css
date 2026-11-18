@@ -50,7 +50,7 @@
 [data-theme="dark"] :is(body,.analytics-app,.analytics-main,.flow-space) {
   background:var(--page-surface); color:var(--ink);
 }
-[data-theme="dark"] :is(.top-global,.workspace-summary,.content-panel,.detail-panel,.schema-list,
+[data-theme="dark"] :is(.top-global,.workspace-summary,.content-panel,.detail-panel,
 .schema-explorer,.schema-explorer-collapsed,.schema-panel-tools,.type-node,.type-node header,.schema-detail-sticky,
 .context-menu,.auth-account-panel,.create-service-dialog,.toast) {
   background:var(--panel-surface); color:var(--ink); border-color:var(--border); box-shadow:none;

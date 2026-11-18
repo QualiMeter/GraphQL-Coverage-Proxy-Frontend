@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
-import {initialStore} from './fixtures';
-import {coverageFor,metricsFor,operationsFor,requestsFor} from './model';
-import {snapshotFromSDL} from './sdl';
+import {initialStore} from '../testSupport/fixtures';
+import {coverageFor,metricsFor,operationsFor,requestsFor} from '../testSupport/model';
+import {snapshotFromSDL} from '../testSupport/sdl';
 describe('coherent analytics',()=>{const run=initialStore.runs[0],snapshot=initialStore.snapshots.find(s=>s.id===run.snapshotId)!;const rows=requestsFor(initialStore,run.id);
  it('derives summary from requests and separates errors',()=>{const m=metricsFor(rows);expect(m.total).toBe(rows.length);expect(m.httpErrors).toBe(rows.filter(x=>x.httpStatus>=400).length);expect(m.graphqlErrors).toBe(rows.filter(x=>x.graphqlErrors.length>0).length);expect(rows.some(x=>x.httpStatus===200&&x.graphqlErrors.length>0)).toBe(true)});
  it('excludes analyzer failures from coverage',()=>{const failed=rows.find(x=>x.analyzerError)!;const op=initialStore.operations.find(x=>x.id===failed.operationId)!;const single={...initialStore,observations:[failed]};expect(coverageFor(snapshot,run,single).summary.coveredFields).toBe(0);expect(op.fields.length).toBeGreaterThan(0)});

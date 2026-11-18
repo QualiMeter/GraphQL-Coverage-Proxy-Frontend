@@ -3,6 +3,8 @@ import {ApiError} from '../api/client';
 import type {RunOut} from '../api/runs';
 import {graphqlProxyUrl, runActionError} from './backendRuns';
 import './runControls.css';
+import {GitlabLaunchForm} from './GitlabLaunchForm';
+import type {GitlabPipeline} from '../api/gitlab';
 
 function RunModal({title, busy, onClose, children}: {
   title: string; busy: boolean; onClose: () => void; children: (close: () => void) => ReactNode;
@@ -28,9 +30,11 @@ function RunModal({title, busy, onClose, children}: {
   );
 }
 
-export function CreateRunDialog({serviceName, endpointNote, snapshotName, onCreate, onClose}: {
-  serviceName: string; endpointNote: string; snapshotName: string; onCreate: (name: string) => Promise<RunOut | null>; onClose: () => void;
+export function CreateRunDialog({serviceId, serviceName, endpointNote, snapshotName, onCreate, onGitlab, onHistory, onClose}: {
+  serviceId: string; serviceName: string; endpointNote: string; snapshotName: string; onCreate: (name: string) => Promise<RunOut | null>; onGitlab:(ref:string,name?:string)=>Promise<GitlabPipeline|null>; onHistory:()=>void; onClose: () => void;
 }) {
+  const [mode,setMode]=useState<'ordinary'|'gitlab'>('ordinary');
+  const [launchLocked,setLaunchLocked]=useState(false);
   const [created, setCreated] = useState<RunOut | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -78,7 +82,7 @@ export function CreateRunDialog({serviceName, endpointNote, snapshotName, onCrea
 
   return (
     <RunModal title={created ? 'Прогон создан' : 'Новый прогон'} busy={busy} onClose={onClose}>
-      {close => created ? <>
+      {close => <>{!created&&<div className="gitlab-mode-picker" role="group" aria-label="Способ создания прогона"><button type="button" className="run-control" aria-pressed={mode==='ordinary'} disabled={busy||launchLocked} onClick={()=>setMode('ordinary')}>Обычный прогон</button><button type="button" className="run-control" aria-pressed={mode==='gitlab'} disabled={busy||launchLocked} onClick={()=>setMode('gitlab')}>Запустить через GitLab CI</button></div>}{mode==='gitlab'?<GitlabLaunchForm key={serviceId} serviceId={serviceId} serviceName={serviceName} snapshotName={snapshotName} onLaunch={onGitlab} onBusy={setBusy} onLock={()=>setLaunchLocked(true)} onClose={close} onHistory={()=>{close();onHistory()}}/>:created ? <>
         <p>{endpointNote}.</p>
         <p>Сбор данных открыт. E2E-тесты нужно запустить отдельно.</p>
         <p>Направьте запросы тестов через <code>{graphqlProxyUrl}</code> и передавайте ID в заголовке <code>X-Coverage-Run-Id</code>. В доверенном CI используйте <code>X-Coverage-Api-Key</code> из секретов окружения согласно документации proxy.</p>
@@ -105,7 +109,7 @@ export function CreateRunDialog({serviceName, endpointNote, snapshotName, onCrea
             <button type="submit" className="run-control run-control-primary" disabled={busy || blocked.current}>{busy ? 'Создаём…' : 'Создать прогон'}</button>
           </div>
         </form>
-      )}
+      )}</>}
     </RunModal>
   );
 }
