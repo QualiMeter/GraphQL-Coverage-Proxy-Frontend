@@ -1,5 +1,4 @@
 .operations-table-scroll {
-  container-type:inline-size;
   overflow:auto;
   min-width:0;
 }
@@ -11,7 +10,8 @@
 
 .table-scroll .operations-table {
   width:100%;
-  min-width:46rem;
+  min-width:72rem;
+  table-layout:fixed;
   border-collapse:separate;
   border-spacing:0;
   --query-surface:#eaf2ff;
@@ -73,6 +73,10 @@
 
 .table-scroll .operations-table td:last-child {
   padding-inline:22px;
+}
+
+.table-scroll .operations-table th:last-child {
+  padding-inline:6px;
 }
 
 .operations-fields-heading {

@@ -15,13 +15,13 @@ type OperationRow = {
 
 const kindLabels = {query:'Query', mutation:'Mutation', subscription:'Subscription'};
 const columns = [
-  {label:'Операция',width:'auto'},
-  {label:'Тип',width:'clamp(6.75rem, 9cqi, 8rem)'},
-  {label:'Выполнений',width:'clamp(6.5rem, 10cqi, 8.5rem)'},
-  {label:'HTTP-ошибки',width:'clamp(7.125rem, 10.5cqi, 9rem)'},
-  {label:'GraphQL-ошибки',width:'clamp(8rem, 12cqi, 10rem)'},
-  {label:'Среднее время',width:'clamp(7.75rem, 11.5cqi, 10rem)'},
-  {label:'Полей',width:'clamp(7rem, 9cqi, 8rem)'},
+  {label:'Операция',width:'25%'},
+  {label:'Тип',width:'12%'},
+  {label:'Выполнений',width:'11%'},
+  {label:'HTTP-ошибки',width:'14%'},
+  {label:'GraphQL-ошибки',width:'14%'},
+  {label:'Среднее время',width:'15%'},
+  {label:'Полей',width:'9%'},
 ];
 const fieldsHint = 'Количество различных полей схемы, затронутых учтёнными обращениями этой операции за выбранный прогон';
 
