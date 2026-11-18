@@ -259,8 +259,8 @@ function Inner(){
  const openType=(t:string,edgeId:string|null=null)=>navigateSchema('type',t,edgeId);
  const travelSchema=(direction:-1|1)=>{const next=moveStep(updateStep(schemaHistory,{viewport:flow.getViewport()}),direction);if(next===schemaHistory||next.index===schemaHistory.index)return;setSchemaHistory(next);const step=currentStep(next)!;setDetail({kind:step.kind,id:step.id});setMode('graph');requestAnimationFrame(()=>requestAnimationFrame(()=>{void flow.setViewport(step.viewport,{duration:300})}))};
  const changeSchemaTab=(tab:'Обзор'|'Связи'|'SDL')=>setSchemaHistory(old=>updateStep(old,{tab}));
- const goOperations=(field:string)=>{setBackendNavigation(value=>value+1);setBackendOperationKey('');setPage('operations');setOperationField(field);setOperationKind('all');setOperationErrors(false);setQuery('');setDetail(null)};
- const goRequests=(filter:RequestFilter='all',field='',operation='')=>{setBackendNavigation(value=>value+1);setPage('requests');setRequestFilter(filter);setRequestField(field);setRequestOperation(operation);setOperationKind('all');setSort('date');setQuery('');setDetail(null)};
+ const goOperations=(field:string)=>{setBackendNavigation(value=>value+1);setBackendOperationKey('');setPage('operations');setOperationField(field);setQuery('');setDetail(null)};
+ const goRequests=(filter:RequestFilter='all',field='',operation='')=>{setBackendNavigation(value=>value+1);setPage('requests');setRequestFilter(filter);setRequestField(field);setRequestOperation(operation);setSort('date');setQuery('');setDetail(null)};
  const summaryAction=(key:string)=>{if(key==='zero-types'){setPage('schema');setMode('graph');setExplorerRequest(value=>value+1);setDetail(null);return}if(key==='operations'){goOperations('');return}const target=summaryDestination(key);setDetail(null);setQuery('');if(target.page==='schema'){setPage('schema');setMode(target.mode as 'graph'|'table');setFieldFilter(target.filter as CoverageFilter)}else{goRequests(target.filter as RequestFilter);if('sort'in target&&target.sort)setSort(target.sort)}};
  const applyImportedSnapshot=(id:string)=>{
   setSnapshotId(id);
