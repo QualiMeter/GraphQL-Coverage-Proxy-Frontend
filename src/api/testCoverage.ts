@@ -2,10 +2,11 @@ import {requestJson} from './client';
 import {matchesSchema,getTestDetail} from './runComparison';
 import {comparisonSchemas} from './comparisonSchemas';
 import type {ExecutionOut,ExecutionFieldOut} from './comparisonDtos';
+import {validateGroupFilters,type TestGroupFilters} from './testGroups';
 export type {ExecutionOut,ExecutionFieldOut} from './comparisonDtos';
 export type ExecutionStatus=ExecutionOut['status'];
 export type TestCoverageSummary={runId:string;collectionStatus:'running'|'completed'|'failed';totalTests:number;totalExecutions:number;statusCounts:Record<string,number>;missingResults:number;inFlightRequests:number;totalRequests:number;attributedRequests:number;unattributedRequests:number};
-export type ExecutionQuery={status?:ExecutionStatus;framework?:'pytest'|'playwright';testId?:string;typeName?:string;fieldName?:string;fieldMode?:'covered'|'selected'|'observed'};
+export type ExecutionQuery=TestGroupFilters&{status?:ExecutionStatus;framework?:'pytest'|'playwright';testId?:string;typeName?:string;fieldName?:string;fieldMode?:'covered'|'selected'|'observed'};
 export type TestPage<T>={rows:T[];total:number|null;more:boolean};
 const path=(runId:string)=>`/api/runs/${encodeURIComponent(runId)}` as const;
 const object=(v:unknown):v is Record<string,unknown>=>Boolean(v&&typeof v==='object'&&!Array.isArray(v));
@@ -23,9 +24,10 @@ function decodePage<T>(data:unknown,response:Response,offset:number,limit:number
  return {rows:data as T[],total,more:total===null?data.length===limit:offset+data.length<total};
 }
 export function listExecutions(runId:string,query:ExecutionQuery,offset:number,signal?:AbortSignal){
+ validateGroupFilters(query);
  if(!Number.isSafeInteger(offset)||offset<0||query.fieldName&&!query.typeName)throw new Error('Некорректная область списка выполнений.');
  const params=new URLSearchParams({limit:'50',offset:String(offset)});
- for(const [key,value] of Object.entries(query))if(value!==undefined&&value!=='')params.set(key,value);
+ for(const [key,value] of Object.entries(query))if(value!==undefined&&value!==''&&value!==false)params.set(key,String(value));
  return requestJson(`${path(runId)}/tests?${params}`,(data,response)=>decodePage<ExecutionOut>(data,response,offset,50,row=>matchesSchema(row,comparisonSchemas.ExecutionOut)&&object(row)&&row.runId===runId),{signal});
 }
 export function getExecutionFields(runId:string,id:string,offset:number,signal?:AbortSignal){
