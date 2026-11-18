@@ -5,9 +5,7 @@ import {fieldId, type GraphType} from '../model';
 import {graphEdges,layout} from '../graph/transform';
 import {TypeNode,type TypeFlowNode} from '../graph/TypeNode';
 import {RoutedEdge} from '../graph/RoutedEdge';
-import {CodeView} from './CodeView';
 import {GraphControls} from './GraphControls';
-import {OperationsTable} from './OperationsTable';
 import {canManageUsers} from '../api/admin';
 import {AdminUsers} from './AdminUsers';
 import {TopChrome} from './TopChrome';
@@ -16,10 +14,6 @@ import {SchemaDetailPanel} from './SchemaDetailPanel';
 import {SchemaCoverageTable} from './SchemaCoverageTable';
 import type {CoverageFilter} from './coverageTableFilters';
 import {currentStep,emptyHistory,moveStep,pushStep,updateStep,type InvestigationHistory} from './schemaInvestigation';
-import {loadStore,saveStore} from './storage';
-import {coverageFor,metricsFor,operationsFor,requestsFor,type Run,type Store} from './model';
-import {snapshotFromSDL} from './sdl';
-import {isMockService, MOCK_SERVICE_ID} from './mockService';
 import {useServiceCatalog} from './serviceCatalog';
 import {useAuth} from './useAuth';
 import {ApiError} from '../api/client';
@@ -49,39 +43,48 @@ import './workspaceDark.css';
 import './profileAdmin.css';
 type Page='schema'|'operations'|'requests'|'history';
 type RequestFilter='all'|'http'|'graphql'|'analyzer';
-const fmt=(v:string|null)=>v?new Date(v).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'}):'—';
-const emptyGraphTypes:GraphType[]=[];
-const duration=(run:Run)=>run.endedAt?`${Math.round((Date.parse(run.endedAt)-Date.parse(run.startedAt))/60000)} мин`:'—';
-function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useRef(saved?.runId??null);const [store,setStore]=useState<Store>(loadStore),[serviceId,setServiceId]=useState(saved?.serviceId??MOCK_SERVICE_ID),[runId,setRunId]=useState(saved?.runId??(saved?'':'reg13')),[snapshotId,setSnapshotId]=useState(saved?.snapshotId??'customer-v2'),[page,setPage]=useState<Page>('schema'),[mode,setMode]=useState<'graph'|'table'>('graph'),[fieldFilter,setFieldFilter]=useState<CoverageFilter>('all'),[query,setQuery]=useState(''),[requestFilter,setRequestFilter]=useState<RequestFilter>('all'),[requestField,setRequestField]=useState(''),[requestOperation,setRequestOperation]=useState(''),[operationKind,setOperationKind]=useState('all'),[operationField,setOperationField]=useState(''),[operationErrors,setOperationErrors]=useState(false),[sort,setSort]=useState('date'),[detail,setDetail]=useState<{kind:'type'|'field'|'operation'|'request';id:string}|null>(null),[detailTab,setDetailTab]=useState('Информация'),[schemaHistory,setSchemaHistory]=useState<InvestigationHistory>(emptyHistory),[explorerRequest,setExplorerRequest]=useState(0),[message,setMessage]=useState('');const flow=useReactFlow();
- useEffect(()=>saveStore(store),[store]);
+function Inner(){
+ const [saved]=useState(readWorkspace);
+ const pendingRestore=useRef(saved?.runId??null);
+ const [serviceId,setServiceId]=useState(saved?.serviceId??'');
+ const [snapshotId,setSnapshotId]=useState(saved?.snapshotId??'');
+ const [page,setPage]=useState<Page>('schema');
+ const [mode,setMode]=useState<'graph'|'table'>('graph');
+ const [fieldFilter,setFieldFilter]=useState<CoverageFilter>('all');
+ const [query,setQuery]=useState('');
+ const [requestFilter,setRequestFilter]=useState<RequestFilter>('all');
+ const [requestField,setRequestField]=useState('');
+ const [requestOperation,setRequestOperation]=useState('');
+ const [operationField,setOperationField]=useState('');
+ const [sort,setSort]=useState('date');
+ const [detail,setDetail]=useState<{kind:'type'|'field';id:string}|null>(null);
+ const [schemaHistory,setSchemaHistory]=useState<InvestigationHistory>(emptyHistory);
+ const [explorerRequest,setExplorerRequest]=useState(0);
+ const [message,setMessage]=useState('');
+ const flow=useReactFlow();
  const auth=useAuth();
  const [adminRevision,setAdminRevision]=useState<number|null>(null);
  const adminOpen=canManageUsers(auth.session)&&adminRevision===auth.revision;
  const {restore,session}=auth;
  const [actionRequest,setActionRequest]=useState<(WorkspaceIntent&{revision:number;serviceId:string})|null>(null);
  const intent=actionRequest?.serviceId===serviceId&&actionRequest.revision===auth.revision?actionRequest:null;
- const catalog=useServiceCatalog(store.services,auth.checked?auth.revision:null);
+ const catalog=useServiceCatalog(auth.checked?auth.revision:null);
  useEffect(()=>{
   if(session&&catalog.state.kind==='error'&&catalog.state.error.status===401)void restore();
  },[catalog.state,restore,session]);
- const mockSelected=isMockService(serviceId);
  const [serviceVersion,setServiceVersion]=useState(0);
  const [snapshotVersion,setSnapshotVersion]=useState(0);
  const serviceScope=`${auth.revision}:${serviceVersion}`;
  const graphScope=`${serviceScope}:${snapshotVersion}`;
- const remoteService=catalog.services.find(service=>service.source==='backend'&&service.id===serviceId);
+ const remoteService=catalog.services.find(service=>service.id===serviceId);
  const hasPrivateServiceAccess=catalog.state.kind==='ready'&&catalog.state.services.some(service=>service.id===serviceId&&!service.isPublic);
- const canFinishRun=mockSelected||canCreateService(session)&&
+ const canFinishRun=canCreateService(session)&&
   (session.user.role==='admin'||Boolean(remoteService?.endpointUrl)||hasPrivateServiceAccess);
  const remote=useBackendSchema(remoteService?.id??null,snapshotId,serviceScope,graphScope);
  const remoteList=remote.snapshots.state;
  const remoteGraph=remote.graph.state;
  const selectedRemote=remote.selected? snapshotOption(remote.selected):null;
- const localSnapshots=mockSelected?store.snapshots.filter(item=>item.serviceId===serviceId):[];
- const mockRuns=mockSelected?store.runs.filter(item=>item.serviceId===serviceId):[];
- const run=mockRuns.find(item=>item.id===runId)??null;
- const snapshot=localSnapshots.find(item=>item.id===(run?.snapshotId??snapshotId))??null;
- const selectedSnapshot=mockSelected?snapshot:selectedRemote;
+ const selectedSnapshot=selectedRemote;
  const schemaId=selectedSnapshot?.id??null;
  const [apiRunSelection,setApiRunSelection]=useState<RunSelection|null>(null);
  const apiRun=remoteService?selectedRun(apiRunSelection,serviceScope,schemaId):null;
@@ -89,7 +92,7 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
  const {coverage:runCoverage,stats,scope:analysisScope,revision:analysisRevision,refresh:refreshRunAnalytics}=
   useRunAnalytics(apiRun,schemaId,`${graphScope}:${coverageVersion}`);
  const [restoreEnded,setRestoreEnded]=useState(false);
- const restoreTarget=!mockSelected&&schemaId===saved?.snapshotId&&serviceId===saved?.serviceId?saved?.runId:null;
+ const restoreTarget=schemaId===saved?.snapshotId&&serviceId===saved?.serviceId?saved?.runId:null;
  useEffect(()=>{
   if(!restoreTarget||!schemaId||pendingRestore.current!==restoreTarget)return;
   const controller=new AbortController();
@@ -107,9 +110,9 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
   return ()=>controller.abort();
  },[restoreTarget,schemaId,serviceScope]);
  useEffect(()=>{
-  if(!mockSelected&&(!schemaId||pendingRestore.current&&!restoreEnded&&schemaId===saved?.snapshotId))return;
-  saveWorkspace({serviceId,snapshotId:schemaId,runId:mockSelected?run?.id??null:apiRun?.id??null});
- },[mockSelected,serviceId,schemaId,run?.id,apiRun?.id,restoreEnded,saved?.snapshotId]);
+  if(!schemaId||pendingRestore.current&&!restoreEnded&&schemaId===saved?.snapshotId)return;
+  saveWorkspace({serviceId,snapshotId:schemaId,runId:apiRun?.id??null});
+ },[serviceId,schemaId,apiRun?.id,restoreEnded,saved?.snapshotId]);
  const [backendNavigation,setBackendNavigation]=useState(0);
  const [backendOperationKey,setBackendOperationKey]=useState('');
  const refreshContext=async()=>{
@@ -133,24 +136,16 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
  const finishTarget=remoteService?selectedRun(finishRequest,serviceScope,schemaId):null;
  const [historyVersion,setHistoryVersion]=useState(0);
  const refreshHistory=()=>setHistoryVersion(version=>version+1);
- const snapshots=mockSelected?localSnapshots:remote.items.map(snapshotOption);
- const requests=useMemo(()=>run?requestsFor(store,run.id):[],[store,run]);
- const metrics=useMemo(()=>metricsFor(requests),[requests]);
- const coverage=useMemo(()=>snapshot&&run?coverageFor(snapshot,run,store):null,[snapshot,run,store]);
- const unmeasuredLocalTypes=useMemo(()=>snapshot&&!run?snapshot.types.map(type=>({
-  ...type, coveragePercent:null, coveredFields:null,
-  fields:type.fields.map(field=>({...field, covered:null, hits:null})),
- })):emptyGraphTypes,[snapshot,run]);
- const operations=useMemo(()=>snapshot?operationsFor(store,snapshot,requests):[],[store,snapshot,requests]);
+ const snapshots=remote.items.map(snapshotOption);
  const snapshotGraph=remoteGraph.kind==='ready'?remoteGraph.data:null;
  const remoteGraphData=runCoverage.data??snapshotGraph;
  const remoteTypes=useMemo(()=>remoteGraphData?schemaGraphTypes(remoteGraphData):emptyGraphTypes,[remoteGraphData]);
- const graphTypes=mockSelected?coverage?.types??unmeasuredLocalTypes:remoteTypes;
- const coverageSummary=coverage?.summary??runCoverage.data?.summary??null;
+ const graphTypes=remoteTypes;
+ const coverageSummary=runCoverage.data?.summary??null;
  const coverageAvailable=coverageSummary!==null;
  const isSdlTab=page==='schema'&&detail?.kind==='type'&&currentStep(schemaHistory)?.tab==='SDL';
  const remoteSdl=useBackendSdl(remoteGraphData&&isSdlTab?remoteGraphData.schemaId:null,graphScope);
- const detailSnapshot=remoteSdl.state.kind==='ready'?{sdl:remoteSdl.state.data}:snapshot;
+ const detailSnapshot=remoteSdl.state.kind==='ready'?{sdl:remoteSdl.state.data}:null;
  const sdlMessage=remoteSdl.state.kind==='error'?remoteSdl.state.error.message:
   remoteSdl.state.kind==='loading'?'Загружаем SDL…':undefined;
  const schemaError=remoteList.kind==='error'?remoteList.error:remoteGraph.kind==='error'?remoteGraph.error:null;
@@ -183,27 +178,23 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
  useEffect(()=>{
   if(lastAuthRevision.current===auth.revision)return;
   lastAuthRevision.current=auth.revision;
-  if(!mockSelected){resetSchemaNavigation();resetSchemaFilters()}
- },[auth.revision,mockSelected,resetSchemaNavigation,resetSchemaFilters]);
- const selectService=(id:string,local:boolean)=>{
+  resetSchemaNavigation();resetSchemaFilters()
+ },[auth.revision,resetSchemaNavigation,resetSchemaFilters]);
+ const selectService=(id:string)=>{
   if(id===serviceId)return;
   pendingRestore.current=null;
-  const firstRun=local?store.runs.find(item=>item.serviceId===id):undefined;
-  const firstSnapshot=local?store.snapshots.find(item=>item.serviceId===id):undefined;
   setServiceId(id);
   setApiRunSelection(null);
   setFinishRequest(null);
   setServiceVersion(version=>version+1);
-  if(!local)setPage('schema');
-  setRunId(firstRun?.id??'');
-  setSnapshotId(firstRun?.snapshotId??firstSnapshot?.id??'');
+  setPage('schema');
+  setSnapshotId('');
   resetSchemaNavigation();
   resetSchemaFilters();
   setMessage('');
  };
  const chooseService=(id:string)=>{
-  const service=catalog.services.find(item=>item.id===id);
-  if(service)selectService(id,service.source==='mock');
+  if(catalog.services.some(service=>service.id===id))selectService(id);
  };
  const submitService=async(input:ServiceCreate)=>{
   const current=auth.getCurrent();
@@ -215,7 +206,7 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
    const latest=auth.getCurrent();
    if(latest.revision!==current.revision||latest.pending||!canCreateService(latest.session))return;
    catalog.refreshAfterCreate(created);
-   selectService(created.id,false);
+   selectService(created.id);
    setMessage('Сервис добавлен');
   }catch(error){
    if(error instanceof ApiError&&(error.status===401||error.status===403))void restore();
@@ -237,23 +228,19 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
    throw error;
   }
  };
- const hadSession=useRef(Boolean(session));
  useEffect(()=>{
-  const signedOut=hadSession.current&&!session;
-  hadSession.current=Boolean(session);
-  const unavailable=catalog.state.kind==='ready'&&!catalog.services.some(service=>service.id===serviceId);
-  if(mockSelected||(!signedOut&&!unavailable))return;
-  const firstRun=store.runs.find(item=>item.serviceId===MOCK_SERVICE_ID);
-  setServiceId(MOCK_SERVICE_ID);
+  if(catalog.state.kind!=='ready'||catalog.services.some(service=>service.id===serviceId))return;
+  const first=catalog.services[0]?.id??'';
+  if(first===serviceId)return;
+  pendingRestore.current=null;
+  setServiceId(first);
+  setSnapshotId('');
   setApiRunSelection(null);
   setFinishRequest(null);
   setServiceVersion(version=>version+1);
-  setRunId(firstRun?.id??'');
-  setSnapshotId(firstRun?.snapshotId??'');
   resetSchemaNavigation();
   resetSchemaFilters();
- },[catalog.services,catalog.state,mockSelected,serviceId,session,store.runs,resetSchemaNavigation,resetSchemaFilters]);
- const chooseRun=(id:string)=>{const next=mockRuns.find(r=>r.id===id);setRunId(id);if(next){setServiceId(next.serviceId);setSnapshotId(next.snapshotId);if(next.snapshotId!==snapshot?.id)resetSchemaNavigation()}else resetSchemaNavigation();setRequestFilter('all');setRequestField('');setRequestOperation('')};
+ },[catalog.state,catalog.services,serviceId,resetSchemaNavigation,resetSchemaFilters]);
  const chooseSnapshot=(id:string)=>{
   if(id===schemaId||!snapshots.some(item=>item.id===id))return;
   pendingRestore.current=null;
@@ -261,7 +248,6 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
   setApiRunSelection(null);
   setFinishRequest(null);
   setSnapshotVersion(version=>version+1);
-  if(run?.snapshotId!==id)setRunId('');
   resetSchemaNavigation();
   resetSchemaFilters();
   setPage('schema');
@@ -280,7 +266,6 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
   setApiRunSelection(null);
   setFinishRequest(null);
   setSnapshotVersion(version=>version+1);
-  setRunId('');
   resetSchemaNavigation();
   resetSchemaFilters();
   setPage('schema');
@@ -301,14 +286,6 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
   }
  };
  const importSnapshot=async(input:SnapshotImport)=>{
-  if(mockSelected){
-   if(input.method!=='sdl')throw new Error('Для mock-сервиса доступен импорт SDL.');
-   const imported=snapshotFromSDL(input.sdl,serviceId,input.fileName??'Вставленный SDL',crypto.randomUUID());
-   setStore(previous=>({...previous,snapshots:[...previous.snapshots,imported]}));
-   applyImportedSnapshot(imported.id);
-   setMessage('Схема импортирована локально');
-   return;
-  }
   const current=auth.getCurrent();
   if(current.pending||current.revision!==intent?.revision||!canCreateService(current.session)){
    throw new ApiError('http','Импорт недоступен для текущей сессии.',current.session?403:401);
@@ -329,7 +306,6 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
    throw error;
   }
  };
- const createRun=()=>{if(!snapshot)return;const name=prompt('Название локального прогона');if(!name?.trim())return;const next:Run={id:crypto.randomUUID(),name:name.trim(),serviceId,snapshotId:snapshot.id,status:'active',startedAt:new Date().toISOString(),endedAt:null};setStore(s=>({...s,runs:[...s.runs,next]}));chooseRun(next.id);setRunId(next.id);setMessage('Локальный прогон создан')};
  const chooseApiRun=(next:RunOut)=>{
   const selection=remoteService?runSelectionForHistory(next,serviceScope,remote.items):null;
   if(!selection)return;
@@ -391,12 +367,10 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
  };
  const requestAction=(action:WorkspaceAction)=>{
   const current=auth.getCurrent();
-  const outcome=workspaceActionFor(action,current.session,mockSelected);
-  if(outcome==='local-run'){createRun();return}
+  const outcome=workspaceActionFor(action,current.session);
   setActionRequest({action,outcome,revision:current.revision,serviceId});
  };
  const closeAction=()=>setActionRequest(current=>current===actionRequest?null:current);
- const finishRun=()=>{if(!run||run.status!=='active')return;setStore(s=>({...s,runs:s.runs.map(r=>r.id===run.id?{...r,status:'completed',endedAt:new Date().toISOString()}:r)}));setMessage('Локальный прогон завершён')};
  const nodesReady=useNodesInitialized();const fittedSnapshot=useRef('');const [hoveredField,setHoveredField]=useState<string|null>(null);
  const [nodePositions,setNodePositions]=useState<Record<string,{x:number;y:number}>>({});
  const [nodeMeasurements,setNodeMeasurements]=useState<Record<string,{width:number;height:number}>>({});
@@ -437,9 +411,7 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
  const focusExplorer=(typeName:string,fieldName?:string,edgeId?:string)=>{if(fieldName)openField(typeName,fieldName);else openType(typeName,edgeId);setMode('graph')};
  const clearExplorerSelection=()=>{setDetail(null);setHoveredField(null)};
  const showOverview=()=>{clearExplorerSelection();setMode('graph');requestAnimationFrame(()=>requestAnimationFrame(()=>{void flow.fitView({padding:.12,minZoom:.3,maxZoom:1,duration:420})}))};
- const viewKey=mockSelected
-  ?`mock:${serviceVersion}:${snapshotVersion}:${schemaId??'none'}`
-  :`backend:${graphScope}:${schemaId??'none'}`;
+ const viewKey=`backend:${graphScope}:${schemaId??'none'}`;
  useEffect(()=>{
   if(page!=='schema'||mode!=='graph'||!schemaId||!nodesReady||!graph.nodes.length||
     !graph.nodes.every(node=>node.measured)||fittedSnapshot.current===viewKey)return;
@@ -450,10 +422,6 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
   });
   return ()=>cancelAnimationFrame(frame);
  },[page,mode,schemaId,viewKey,nodesReady,graph.nodes,flow]);
- const visibleOps=operations.filter(o=>o.name.toLowerCase().includes(query.toLowerCase())&&(operationKind==='all'||o.kind===operationKind)&&(!operationErrors||o.httpErrors+o.graphqlErrors>0)&&(!operationField||o.fields.some(ref=>fieldId(ref.type,ref.field)===operationField))).sort((a,b)=>sort==='duration'?b.averageMs-a.averageMs:sort==='errors'?b.httpErrors+b.graphqlErrors-a.httpErrors-a.graphqlErrors:b.count-a.count);
- const visibleRequests=requests.filter(r=>{const op=store.operations.find(o=>o.id===r.operationId);return (op?.name.toLowerCase().includes(query.toLowerCase())??false)&&(requestFilter==='all'||requestFilter==='http'&&r.httpStatus>=400||requestFilter==='graphql'&&r.graphqlErrors.length>0||requestFilter==='analyzer'&&!!r.analyzerError)&&(!requestField||r.hasData&&!r.analyzerError&&op?.fields.some(f=>fieldId(f.type,f.field)===requestField))&&(!requestOperation||r.operationId===requestOperation)&&(operationKind==='all'||op?.kind===operationKind)}).sort((a,b)=>sort==='duration'?b.durationMs-a.durationMs:b.at.localeCompare(a.at));
- const history=mockRuns.filter(r=>r.name.toLowerCase().includes(query.toLowerCase())&&(operationKind==='all'||r.status===operationKind)).sort((a,b)=>sort==='coverage'?(coverageFor(store.snapshots.find(s=>s.id===b.snapshotId)!,b,store).summary.coveragePercent-coverageFor(store.snapshots.find(s=>s.id===a.snapshotId)!,a,store).summary.coveragePercent):b.startedAt.localeCompare(a.startedAt));
- const selectedOp=detail?.kind==='operation'?store.operations.find(o=>o.id===detail.id):null;const selectedRequest=detail?.kind==='request'?store.observations.find(o=>o.id===detail.id):null;
  const realAnalytics=apiRun&&(page==='operations'||page==='requests')&&(()=>{
   const Analytics=page==='operations'?BackendOperations:BackendRequests;
   return <Analytics key={JSON.stringify([analysisScope,page,backendNavigation])} scope={analysisScope!} revision={analysisRevision}
