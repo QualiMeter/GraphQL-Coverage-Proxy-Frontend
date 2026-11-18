@@ -6,11 +6,11 @@ import {executionStatuses} from './testCoverageModel';
 export function ExecutionLink({execution,onOpen}:{execution:ExecutionOut;onOpen?:(id:string)=>void}){
  return <button type="button" className="detail-list-row" disabled={!onOpen} onClick={()=>onOpen?.(execution.id)}>{execution.name} · {executionStatuses[execution.status]} · попытка {execution.attempt} →</button>;
 }
-export function RelatedExecution({runId,executionId,scope,revision=0,onOpen}:{runId:string;executionId:string|null|undefined;scope:string;revision?:number;onOpen?:(id:string)=>void}){
+export function RelatedExecution({runId,executionId,scope,revision=0,onOpen,compact=false}:{runId:string;executionId:string|null|undefined;scope:string;revision?:number;onOpen?:(id:string)=>void;compact?:boolean}){
  const resource=useComparisonResource(executionId?JSON.stringify([scope,runId,executionId,revision]):null,signal=>getExecution(runId,executionId!,signal));
  if(executionId===null)return <p>Без привязки к тесту.</p>;
  if(executionId===undefined)return <p>Данные о привязке к тесту недоступны.</p>;
- return <div className="test-request-link"><strong>Связанное выполнение</strong><TestResourceStatus resource={resource}/>{resource.data&&<ExecutionLink execution={resource.data} onOpen={onOpen}/>}</div>;
+ return <div className="test-request-link">{!compact&&<strong>Связанное выполнение</strong>}<TestResourceStatus resource={resource}/>{resource.data&&<ExecutionLink execution={resource.data} onOpen={onOpen}/>}</div>;
 }
 export function FieldTestExecutions({runId,typeName,fieldName,scope,allowed,revision=0,onOpen}:{runId?:string|null;typeName:string;fieldName:string;scope:string;allowed:boolean;revision?:number;onOpen?:(id:string)=>void}){
  const [open,setOpen]=useState(false),[offset,setOffset]=useState(0);
