@@ -45,6 +45,6 @@ it('enables the top export only after a successful real comparison component cal
  vi.mocked(compareRuns).mockResolvedValue(data);props.comparisonMode=true;
  function ComparisonApp(){const [visible]=useState(true);return <ExportWorkspace><ExportCenter {...props}/>{visible&&<RunComparison snapshots={[{id:'snapshot',name:'Schema',source:'sdl',createdAt:'2026-11-19T00:00:00Z'}]} initialSnapshotId="snapshot" session={null} onBack={()=>{}}/>}</ExportWorkspace>}
  await act(async()=>root.render(createElement(ComparisonApp)));expect(button('Экспорт').disabled).toBe(true);await click('Сравнить');expect(button('Экспорт').disabled).toBe(false);
- await act(async()=>{const select=[...container.querySelectorAll('select')].find(el=>el.parentElement?.textContent?.startsWith('Baseline'))!;select.value='b';select.dispatchEvent(new Event('change',{bubbles:true}))});expect(button('Экспорт').disabled).toBe(true);
+ await click('Поменять местами');expect(button('Экспорт').disabled).toBe(true);
  await act(async()=>{const checkbox=container.querySelectorAll<HTMLInputElement>('.comparison-run-picker input')[2];checkbox.click()});expect(button('Экспорт').disabled).toBe(true);
 });
