@@ -5,7 +5,7 @@ export type Relation={id:string;source:string;field:string;target:string;covered
 export type NestedRelation={first:Relation;second:Relation};
 export type SchemaSelection={kind:'type'|'field';id:string};
 export type Viewport={x:number;y:number;zoom:number};
-export type InvestigationStep=SchemaSelection&{edgeId:string|null;tab:'Обзор'|'Связи'|'SDL';viewport:Viewport};
+export type InvestigationStep=SchemaSelection&{edgeId:string|null;tab:'Обзор'|'Связи'|'SDL'|'Тесты'|'Пути';viewport:Viewport};
 export type InvestigationHistory={entries:InvestigationStep[];index:number};
 export const emptyHistory:InvestigationHistory={entries:[],index:-1};
 export const currentStep=(history:InvestigationHistory)=>history.entries[history.index]??null;
@@ -16,7 +16,9 @@ export function needsSchemaDetailSdl(step:InvestigationStep|null,types:GraphType
  if(!step)return false;
  if(step.kind==='type')return step.tab==='SDL';
  const type=types.find(type=>type.name===step.id.slice(0,step.id.indexOf('.')));
- return Boolean(type&&isQueryMutationRoot(type)&&(step.tab==='SDL'||type.fields.find(field=>fieldId(type.name,field.name)===step.id)?.args===undefined));
+ if(!type||!isQueryMutationRoot(type))return false;
+ const args=type.fields.find(field=>fieldId(type.name,field.name)===step.id)?.args;
+ return step.tab==='SDL'||args===undefined||(step.tab==='Обзор'&&args.length>0);
 }
 export function fieldSdl(snapshot:{sdl:string}|null,typeName:string,fieldName:string){
  if(!snapshot?.sdl)return null;

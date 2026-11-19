@@ -283,7 +283,7 @@ function Inner({auth,owner}:{auth:ReturnType<typeof useAuth>;owner:string}){cons
  const openField=(t:string,f:string)=>navigateSchema('field',fieldId(t,f));
  const openType=(t:string,edgeId:string|null=null)=>navigateSchema('type',t,edgeId);
  const travelSchema=(direction:-1|1)=>{const next=moveStep(updateStep(schemaHistory,{viewport:flow.getViewport()}),direction);if(next===schemaHistory||next.index===schemaHistory.index)return;setSchemaHistory(next);const step=currentStep(next)!;setDetail({kind:step.kind,id:step.id});setMode('graph');requestAnimationFrame(()=>requestAnimationFrame(()=>{void flow.setViewport(step.viewport,{duration:300})}))};
- const changeSchemaTab=(tab:'Обзор'|'Связи'|'SDL')=>setSchemaHistory(old=>updateStep(old,{tab}));
+ const changeSchemaTab=(tab:'Обзор'|'Связи'|'SDL'|'Тесты'|'Пути')=>setSchemaHistory(old=>updateStep(old,{tab}));
  const goOperations=(field:string)=>{setBackendNavigation(value=>value+1);setBackendOperationKey('');setPage('operations');setOperationField(field);setQuery('');setDetail(null)};
  const goRequests=(filter:RequestFilter='all',field='',operation='')=>{setTestJournal(null);setRequestPath(null);setBackendNavigation(value=>value+1);setPage('requests');setRequestFilter(filter);setRequestField(field);setRequestOperation(operation);setSort('date');setQuery('');setDetail(null)};
  const findRequestsForPath=(path:SchemaCoordinate[])=>{if(!apiRun||!schemaId||!path.length)return;const next=pathSearchNavigation(serviceScope,apiRun.id,schemaId,path);goRequests('all',next.field);setRequestPath(next)};
@@ -446,6 +446,21 @@ function Inner({auth,owner}:{auth:ReturnType<typeof useAuth>;owner:string}){cons
  const [nodePositions,setNodePositions]=useState<Record<string,{x:number;y:number}>>({});
  const [nodeMeasurements,setNodeMeasurements]=useState<Record<string,{width:number;height:number}>>({});
  const onNodesChange=useCallback((changes:NodeChange<TypeFlowNode>[])=>{const key=(id:string)=>(schemaId??'')+':'+id;const positions=changes.filter(c=>c.type==='position'&&c.position);if(positions.length)setNodePositions(old=>{const next={...old};for(const change of positions)if(change.type==='position'&&change.position)next[key(change.id)]=change.position;return next});const dimensions=changes.filter(c=>c.type==='dimensions'&&c.dimensions);if(dimensions.length)setNodeMeasurements(old=>{const next={...old};let changed=false;for(const change of dimensions)if(change.type==='dimensions'&&change.dimensions){const id=key(change.id),size=change.dimensions;if(next[id]?.width!==size.width||next[id]?.height!==size.height){next[id]=size;changed=true}}return changed?next:old})},[schemaId]);
+ const pathHighlightContext=JSON.stringify([serviceScope,schemaId,apiRun?.id,page,detail,schemaHistory.index]);
+ const [highlightedPath,setHighlightedPath]=useState<{context:string;path:SchemaCoordinate[]}|null>(null);
+ const activePath=highlightedPath?.context===pathHighlightContext?highlightedPath.path:null;
+ const highlightPath=useCallback((path:SchemaCoordinate[]|null)=>{
+  setHighlightedPath(path?{context:pathHighlightContext,path}:null);
+  setHoveredField(null);
+ },[pathHighlightContext]);
+ useEffect(()=>{
+  if(!activePath||mode!=='graph'||!nodesReady)return;
+  const frame=requestAnimationFrame(()=>{void flow.fitView({
+   nodes:[...new Set(activePath.map(step=>step.typeName))].map(id=>({id})),
+   padding:.2,maxZoom:1,duration:420,
+  })});
+  return ()=>cancelAnimationFrame(frame);
+ },[activePath,mode,nodesReady,flow]);
  const graph=useMemo(()=>{
   if(!graphTypes.length)return {nodes:[] as TypeFlowNode[],edges:[] as Edge[]};
   const positions=layout({types:graphTypes}),relations=graphEdges({types:graphTypes});
@@ -462,6 +477,17 @@ function Inner({auth,owner}:{auth:ReturnType<typeof useAuth>;owner:string}){cons
   if(activeType){visibleNodes.add(activeType);for(const edge of relations)if(edge.source===activeType||edge.target===activeType){visibleNodes.add(edge.source);visibleNodes.add(edge.target)}}
   if(sourceType){visibleNodes.add(sourceType);if(selectedRelation)visibleNodes.add(selectedRelation.target)}
   if(selectedEdgeId){const relation=relations.find(edge=>edge.id===selectedEdgeId);if(relation){visibleNodes.add(relation.source);visibleNodes.add(relation.target)}}
+  const pathFields=activePath?.map(step=>fieldId(step.typeName,step.fieldName));
+  const pathEdges=new Set<string>();
+  if(activePath){
+   visibleNodes.clear();
+   for(const step of activePath)visibleNodes.add(step.typeName);
+   for(let index=0;index<activePath.length-1;index++){
+    const step=activePath[index],next=activePath[index+1];
+    const relation=relations.find(edge=>edge.source===step.typeName&&edge.sourceHandle==='field:'+fieldId(step.typeName,step.fieldName)&&edge.target===next.typeName);
+    if(relation)pathEdges.add(relation.id);
+   }
+  }
   const nodes:TypeFlowNode[]=graphTypes.map(type=>{
    const dimmed=hasSelection&&!visibleNodes.has(type.name);
    return {
@@ -471,19 +497,19 @@ function Inner({auth,owner}:{auth:ReturnType<typeof useAuth>;owner:string}){cons
     draggable:!dimmed,
     className:dimmed?'schema-node-dimmed':undefined,
     style:{opacity:dimmed?.3:1},
-    data:{schemaType:type,incoming:incoming.get(type.name)??[],selectedType:activeType??sourceType,selectedField:activeField,selectedTarget:selectedRelation?.target??null,hoveredField,hoveredTarget:relations.find(edge=>edge.sourceHandle==='field:'+hoveredField)?.target??null,onType:openType,onField:openField,onHoverField:setHoveredField}
+    data:{pathFields,schemaType:type,incoming:incoming.get(type.name)??[],selectedType:activeType??sourceType,selectedField:activeField,selectedTarget:activePath?null:selectedRelation?.target??null,hoveredField,hoveredTarget:activePath?null:relations.find(edge=>edge.sourceHandle==='field:'+hoveredField)?.target??null,onType:openType,onField:openField,onHoverField:setHoveredField}
    };
   });
   const edges:Edge[]=relations.map((edge,index)=>{
    const field=edge.sourceHandle.replace('field:','');
-   const selected=selectedEdgeId?edge.id===selectedEdgeId:activeField?activeField===field:activeType?edge.source===activeType||edge.target===activeType:false;
-   const hovered=hoveredField===field;
+   const selected=activePath?pathEdges.has(edge.id):selectedEdgeId?edge.id===selectedEdgeId:activeField?activeField===field:activeType?edge.source===activeType||edge.target===activeType:false;
+   const hovered=!activePath&&hoveredField===field;
    const dimmed=!hovered&&(hasSelection?!selected:Boolean(hoveredField));
    const stroke=selected||hovered?'var(--graph-edge-active)':edge.covered?'var(--graph-edge-covered)':'var(--graph-edge-muted)';
    return {id:edge.id,source:edge.source,target:edge.target,sourceHandle:edge.sourceHandle,targetHandle:'target:'+edge.id,ariaLabel:edge.covered===undefined?undefined:`${field} → ${edge.target}: ${edge.covered?'Покрыто':'Не покрыто'}`,type:'routed',className:dimmed?'schema-edge-dimmed':undefined,focusable:!dimmed,selectable:!dimmed,data:{offset:(index%4)*6,obstacles:boxes.filter(box=>box.id!==edge.source&&box.id!==edge.target)},markerEnd:{type:MarkerType.ArrowClosed,width:12,height:12,color:stroke},style:{stroke,strokeWidth:selected||hovered?2.4:1.25,opacity:dimmed?.14:1}};
   });
   return {nodes,edges};
- },[graphTypes,detail,hoveredField,nodePositions,nodeMeasurements,schemaId,schemaHistory]);
+ },[graphTypes,detail,hoveredField,nodePositions,nodeMeasurements,schemaId,schemaHistory,activePath]);
  const focusExplorer=(typeName:string,fieldName?:string,edgeId?:string)=>{if(fieldName)openField(typeName,fieldName);else openType(typeName,edgeId);setMode('graph')};
  const clearSchemaSelection=()=>{setDetail(null);setHoveredField(null)};
  const viewKey=`backend:${graphScope}:${schemaId??'none'}`;
@@ -553,7 +579,7 @@ function Inner({auth,owner}:{auth:ReturnType<typeof useAuth>;owner:string}){cons
   onFilter={setFieldFilter}
   onSort={setSort}
   onField={openField}
- /> }</div></>:null}{page==='schema'&&(detail?.kind==='type'||detail?.kind==='field')&&<SchemaDetailPanel testRevision={analysisRevision} onTest={openTests} runId={apiRun?.id} snapshotId={schemaId} resourceScope={serviceScope} onFindPath={findRequestsForPath} showAnalyticsLinks={Boolean(apiRun)} canOpenRequests={mayReadJournal(session?.user.role)} types={graphTypes} snapshot={detailSnapshot} sdlMessage={sdlMessage} history={schemaHistory} onBack={()=>travelSchema(-1)} onForward={()=>travelSchema(1)} onClose={clearSchemaSelection} onTab={changeSchemaTab} onType={(name,edgeId)=>focusExplorer(name,undefined,edgeId)} onField={(type,field)=>focusExplorer(type,field)} onOperations={goOperations} onRequests={field=>goRequests('all',field)}/>}</div></main>}{finishTarget&&<FinishRunDialog key={finishTarget.id} run={finishTarget} onFinish={completeApiRun} onClose={()=>setFinishRequest(null)}/>}</div></ExportWorkspace>}
+ /> }</div></>:null}{page==='schema'&&(detail?.kind==='type'||detail?.kind==='field')&&<SchemaDetailPanel onHighlightPath={highlightPath} testRevision={analysisRevision} onTest={openTests} runId={apiRun?.id} snapshotId={schemaId} resourceScope={serviceScope} onFindPath={findRequestsForPath} showAnalyticsLinks={Boolean(apiRun)} canOpenRequests={mayReadJournal(session?.user.role)} types={graphTypes} snapshot={detailSnapshot} sdlMessage={sdlMessage} history={schemaHistory} onBack={()=>travelSchema(-1)} onForward={()=>travelSchema(1)} onClose={clearSchemaSelection} onTab={changeSchemaTab} onType={(name,edgeId)=>focusExplorer(name,undefined,edgeId)} onField={(type,field)=>focusExplorer(type,field)} onOperations={goOperations} onRequests={field=>goRequests('all',field)}/>}</div></main>}{finishTarget&&<FinishRunDialog key={finishTarget.id} run={finishTarget} onFinish={completeApiRun} onClose={()=>setFinishRequest(null)}/>}</div></ExportWorkspace>}
 function Empty({text}:{text:string}){return <div className="empty-state">{text}</div>}
 function AuthenticatedWorkspace(){
  const auth=useAuth();
