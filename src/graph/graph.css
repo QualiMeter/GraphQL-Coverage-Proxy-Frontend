@@ -2,3 +2,6 @@
 .react-flow__handle.source{background:#7f69ac!important;border:2px solid #fff!important;width:9px!important;height:9px!important}
 .react-flow__handle.target{background:#fff!important;border:2px solid #8b70bf!important;width:9px!important;height:9px!important}
 .react-flow__edge-path{transition:stroke .12s ease,opacity .12s ease,stroke-width .12s ease}
+.schema-node-dimmed .react-flow__handle{pointer-events:none}
+.react-flow__edge.schema-edge-dimmed,
+.react-flow__edge.schema-edge-dimmed *{pointer-events:none!important}

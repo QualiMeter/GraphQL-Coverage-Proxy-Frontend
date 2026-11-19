@@ -191,6 +191,12 @@
 .schema-table-scroll .schema-coverage-table tbody tr.selected { background: #e7efff; }
 .schema-coverage-table tr.selected td:first-child { box-shadow: inset 3px 0 var(--primary); }
 .schema-coverage-table tr.selected .schema-table-field { color: #294cb8; }
+.schema-table-scroll .schema-coverage-table tbody tr.selected-type {
+  background: color-mix(in srgb, var(--selected-surface) 65%, var(--panel-surface));
+}
+.schema-coverage-table tr.selected-type td:first-child {
+  box-shadow: inset 2px 0 color-mix(in srgb, var(--focus-ring) 60%, var(--panel-surface));
+}
 
 .schema-table-empty {
   margin: 0;
@@ -216,6 +222,7 @@
   .schema-table-scroll .schema-coverage-table {
     --hits-width: 46px;
     --status-width: 92px;
+    min-width: 360px;
   }
 
   .schema-table-type-col { width: 18%; }

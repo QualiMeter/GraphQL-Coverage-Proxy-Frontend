@@ -2,7 +2,6 @@
 .schema-detail-sticky{flex:none;z-index:2;background:#fff;border-bottom:1px solid #e6ecf5;padding:16px 20px 12px}
 .schema-detail-sticky .detail-head{margin:0 0 10px}.schema-detail-sticky .detail-head strong{font-size:17px}
 .schema-detail-nav{display:flex;gap:8px}.schema-detail-nav button{border:1px solid #dbe5f3;border-radius:8px;background:#f8faff;color:#3d5b91;font-size:12px;font-weight:700;padding:7px 10px}.schema-detail-nav button:hover:not(:disabled){background:#eaf0ff}.schema-detail-nav button:disabled{opacity:.42;cursor:default}
-.schema-detail-breadcrumb{font-size:11px;color:#74849b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:10px}
 .schema-detail-scroll{min-height:0;overflow:auto;overscroll-behavior:contain;padding:17px 20px 24px}
 .schema-detail-scroll>small{color:#7183a0;font-size:11px;font-weight:700;letter-spacing:.06em}.schema-detail-scroll h2{font-size:23px;margin:5px 0 13px;color:#20334f}.schema-detail-scroll section{margin-top:20px}.schema-detail-scroll h3{font-size:15px;margin:0 0 9px;color:#344963}.schema-detail-scroll h3 span{font-size:12px;color:#8190a5;margin-left:5px}.schema-detail-scroll p{color:#687b95;font-size:12px}
 .schema-detail-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.schema-detail-stats>span{display:grid;gap:3px;background:#f6f9fe;border:1px solid #e8eef8;border-radius:9px;padding:9px 11px}.schema-detail-stats b{font-size:19px;color:#3157cf}.schema-detail-stats small{font-size:11px;color:#70829b}.schema-request-count{margin:13px 0 0}.schema-request-count strong{color:#294875}
@@ -12,4 +11,66 @@
 .schema-detail-scroll dl{display:grid;grid-template-columns:115px minmax(0,1fr);gap:12px;margin:16px 0}.schema-detail-scroll dt{font-size:12px;color:#78879e}.schema-detail-scroll dd{text-align:left;font-size:12px;overflow-wrap:anywhere}.schema-detail-scroll dd code{display:block;white-space:pre-wrap}.schema-detail-scroll dd button{border:0;background:none;padding:0;color:#345ccc;font-weight:700}.schema-linked-type{width:100%;text-align:left;border:1px solid #dce6f5;border-radius:9px;background:#f8faff;padding:11px;color:#35517a;font-size:12px}.schema-linked-type span{float:right}.schema-detail-actions{display:flex;flex-wrap:wrap;gap:8px}.schema-detail-actions button{border:1px solid #cddaf2;border-radius:8px;background:#f2f6ff;color:#365ac3;font-size:12px;font-weight:700;padding:8px 10px}.schema-detail-actions button:disabled{opacity:.45;cursor:default}
 .schema-sdl .code-view{max-height:420px;overflow:auto}.schema-sdl .code-view pre{white-space:pre;overflow:auto}.schema-detail-panel button:focus-visible{outline:2px solid #4361ee;outline-offset:2px}
 @media(max-width:1250px){.schema-detail-panel{width:360px}}
-@media(max-width:900px){.schema-detail-panel{position:absolute;right:12px;top:0;bottom:0;width:min(430px,calc(100vw - 24px));z-index:5;box-shadow:0 12px 35px #1c335b24}}
+@media(max-width:900px){
+  .page-schema .view-body:has(> .schema-detail-panel){
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr);
+    grid-template-rows:clamp(320px,44dvh,520px) auto;
+    flex:1 0 auto;
+  }
+  .page-schema .view-body:has(> .schema-detail-panel):has(> .content-panel > .schema-table-tools){
+    grid-template-rows:clamp(440px,55dvh,560px) auto;
+  }
+  .page-schema .schema-detail-panel{position:static;grid-column:1/-1;width:auto;max-height:360px}
+}
+
+/* Flat detail controls share the same palette in both themes. */
+.analytics-app .schema-detail-panel.schema-detail-panel .schema-type-tabs {
+  gap:0; margin:6px 0 14px; border-bottom:1px solid var(--separator);
+}
+.analytics-app .schema-detail-panel.schema-detail-panel .schema-type-tabs button {
+  border:0; border-bottom:2px solid transparent; border-radius:0;
+  background:transparent; box-shadow:none; color:var(--text-secondary); padding:9px 6px;
+}
+.analytics-app .schema-detail-panel.schema-detail-panel .schema-type-tabs button[aria-selected=true] {
+  border-bottom-color:var(--primary); color:var(--primary); background:transparent;
+}
+.analytics-app .schema-detail-panel.schema-detail-panel .schema-type-tabs button:hover {
+  background:var(--hover-surface); color:var(--primary);
+}
+.analytics-app .schema-detail-panel.schema-detail-panel :is(.schema-field-list,.schema-relations) {
+  border-color:var(--separator);
+}
+.analytics-app .schema-detail-panel.schema-detail-panel :is(.schema-field-list,.schema-relations) button {
+  padding:9px 2px; background:transparent; border:0;
+  border-bottom:1px solid var(--separator); border-radius:0; box-shadow:none; color:var(--text);
+}
+.analytics-app .schema-detail-panel.schema-detail-panel :is(.schema-field-list,.schema-relations) button:hover,
+.analytics-app .schema-detail-panel.schema-detail-panel .schema-relations button.active {
+  background:var(--hover-surface);
+}
+.analytics-app .schema-detail-panel.schema-detail-panel .schema-relations button.active {
+  box-shadow:inset 2px 0 var(--primary);
+}
+.analytics-app .schema-detail-panel.schema-detail-panel .relation-direction {
+  background:transparent; color:var(--primary); width:20px; height:20px;
+}
+.analytics-app .schema-detail-panel.schema-detail-panel .schema-detail-stats {
+  background:transparent; gap:12px; padding-block:8px;
+}
+.analytics-app .schema-detail-panel.schema-detail-panel .schema-detail-stats>span {
+  background:transparent; border:0; border-radius:0; padding:0;
+}
+.schema-type-coverage {
+  display:grid; grid-template-columns:auto minmax(0,1fr); gap:10px 16px;
+  align-items:center; padding:4px 0 8px; color:var(--text);
+}
+.schema-type-coverage>strong {font-size:30px;line-height:1.2;font-variant-numeric:tabular-nums;color:var(--primary)}
+.schema-type-coverage>div:not(.schema-type-progress) {display:grid;gap:4px;font-size:13px}
+.schema-type-coverage small {font-size:12px;color:var(--text-secondary)}
+.schema-type-progress {grid-column:1/-1;height:4px;border-radius:4px;background:var(--separator);overflow:hidden}
+.schema-type-progress i {display:block;height:100%;background:#b9b7bf}
+.schema-type-progress.partial i {background:#e0a23c}
+.schema-type-progress.complete i {background:#32aa7c}
+.analytics-app .schema-detail-panel.schema-detail-panel .schema-sdl .code-view {background:var(--raised-surface);border-color:var(--separator)}
+.analytics-app .schema-detail-panel.schema-detail-panel button:focus-visible {outline-color:var(--focus-ring)}
