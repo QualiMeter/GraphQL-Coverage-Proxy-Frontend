@@ -1,6 +1,7 @@
 import {millisValue} from './runAnalyticsModel';
 import {ActionTooltip} from './ActionTooltip';
 import './operationsTable.css';
+import {OperationIdentity} from './OperationIdentity';
 
 type OperationRow = {
   id:string;
@@ -11,13 +12,14 @@ type OperationRow = {
   graphqlErrors:number;
   averageMs:number|null;
   fieldCount:number;
+  anonymous?:boolean;
 };
 
 const kindLabels = {query:'Query', mutation:'Mutation', subscription:'Subscription'};
 const columns = [
   {label:'Операция',width:'25%'},
   {label:'Тип',width:'12%'},
-  {label:'Выполнений',width:'11%'},
+  {label:'Обращений',width:'11%'},
   {label:'HTTP-ошибки',width:'14%'},
   {label:'GraphQL-ошибки',width:'14%'},
   {label:'Среднее время',width:'15%'},
@@ -43,7 +45,7 @@ export function OperationsTable({rows,selectedId,onSelect}:{
           </ActionTooltip></div>
         </th>:<th key={label} scope="col">{label}</th>)}</tr></thead>
       <tbody>{rows.map(row=><tr key={row.id} className={row.id===selectedId?'selected':undefined} onClick={()=>onSelect(row.id)}>
-        <td><button className="operation-name" type="button" aria-current={row.id===selectedId?'true':undefined}>{row.name}</button></td>
+        <td><button className="operation-name" type="button" aria-current={row.id===selectedId?'true':undefined}>{row.name}</button>{row.anonymous&&<OperationIdentity operationKey={row.id}/>}</td>
         <td><span className="operation-kind" data-kind={row.kind}>{kindLabels[row.kind]}</span></td>
         <td className="operation-count">{row.count}</td>
         <td className={row.httpErrors>0?'operation-error':'operation-zero'}>{row.httpErrors}</td>

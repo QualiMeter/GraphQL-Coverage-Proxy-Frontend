@@ -6,7 +6,7 @@ import {EvidenceBadge,EvidenceMeaning,EvidenceResourceStatus,EvidenceWarnings} f
 
 export function RequestFieldLink({field,evidence,loaded,loading,onField}:{field:RequestDetail['selectedFields'][number];evidence?:FieldEvidenceOut;loaded:boolean;loading:boolean;onField:(type:string,field:string)=>void}){
  const state=evidence?requestEvidenceState(evidence):loading?'loading':loaded?'unavailable':'not_loaded';
- return <button type="button" className="detail-list-row evidence-field-link" onClick={()=>onField(field.typeName,field.fieldName)}><span>{field.typeName}.{field.fieldName}{field.returnType&&<small>{field.returnType}</small>}</span><EvidenceBadge state={state} note={!evidence&&loaded?'Evidence для этой координаты не возвращён. Присутствие поля неизвестно.':undefined}/></button>;
+ return <button type="button" className="detail-list-row evidence-field-link" onClick={()=>onField(field.typeName,field.fieldName)}><span>{field.typeName}.{field.fieldName}{field.returnType&&<small>{field.returnType}</small>}</span><EvidenceBadge state={state} note={!evidence&&loaded?'Evidence для этой координаты не возвращён. Присутствие поля неизвестно.':undefined}/><span className="request-field-arrow" aria-hidden="true">›</span></button>;
 }
 export function RequestFieldEvidence({request,snapshotId,scope,allowed,onField}:{request:RequestDetail;snapshotId?:string;scope:string;allowed:boolean;onField:(type:string,field:string)=>void}){
  const [offset,setOffset]=useState(0),[previous,setPrevious]=useState<FieldEvidenceOut[]>([]);

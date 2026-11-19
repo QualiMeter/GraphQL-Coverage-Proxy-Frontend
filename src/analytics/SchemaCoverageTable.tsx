@@ -1,4 +1,4 @@
-import {useId, useMemo, useState} from 'react';
+import {useId, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {Select} from '../components/Select';
 import type {GraphType} from '../model';
 import {
@@ -30,6 +30,7 @@ type Props = {
   query: string;
   filter: CoverageFilter;
   sort: string;
+  selectedType: string | null;
   selectedField: string | null;
   onQuery: (query: string) => void;
   onFilter: (filter: CoverageFilter) => void;
@@ -40,7 +41,7 @@ type Props = {
 const fieldCount = new Intl.NumberFormat('ru-RU');
 
 export function SchemaCoverageTable({
-  types, coverageAvailable = true, sdl, query, filter, sort, selectedField, onQuery, onFilter, onSort, onField,
+  types, coverageAvailable = true, sdl, query, filter, sort, selectedType, selectedField, onQuery, onFilter, onSort, onField,
 }: Props) {
   const advancedId = useId();
   const [type, setType] = useExportFilterState('coverage','type','');
@@ -61,6 +62,28 @@ export function SchemaCoverageTable({
     ...advanced, hits: coverageAvailable ? advanced.hits : 'all', deprecated: hasDeprecated ? advanced.deprecated : 'all',
     type, search, coverage: coverageAvailable ? filter : 'all',
   }, order), [fields, advanced, coverageAvailable, hasDeprecated, type, search, filter, order]);
+  const firstTypeField = selectedType && !selectedField ? visibleFields.find(row => row.type === selectedType)?.id : undefined;
+  const scrollArea = useRef<HTMLDivElement>(null);
+  const firstTypeRow = useRef<HTMLTableRowElement>(null);
+  const tableHead = useRef<HTMLTableSectionElement>(null);
+  const scrolledType = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!selectedType || selectedField) {
+      scrolledType.current = null;
+      return;
+    }
+    const area = scrollArea.current;
+    const row = firstTypeRow.current;
+    const stickyHeader = tableHead.current?.rows[0]?.cells[0];
+    if (scrolledType.current === selectedType || !area || !row || !stickyHeader) return;
+    scrolledType.current = selectedType;
+    const rowBounds = row.getBoundingClientRect();
+    const visibleTop = stickyHeader.getBoundingClientRect().bottom;
+    const visibleBottom = area.getBoundingClientRect().top + area.clientHeight;
+    if (rowBounds.top < visibleTop || rowBounds.bottom > visibleBottom) {
+      area.scrollTop += rowBounds.top - visibleTop;
+    }
+  }, [selectedType, selectedField, firstTypeField]);
 
   function updateAdvanced<Key extends keyof AdvancedFilters>(key: Key, value: AdvancedFilters[Key]) {
     setAdvanced(previous => ({...previous, [key]: value}));
@@ -134,7 +157,7 @@ export function SchemaCoverageTable({
           })}
         </div>}
       </div>
-      <div className="table-scroll schema-table-scroll">
+      <div className="table-scroll schema-table-scroll" ref={scrollArea}>
         <table className="schema-coverage-table" aria-label={coverageAvailable ? "Покрытие полей схемы" : "Поля схемы"}>
           <colgroup>
             <col className="schema-table-type-col"/>
@@ -143,7 +166,7 @@ export function SchemaCoverageTable({
             <col className="schema-table-hits-col"/>
             <col className="schema-table-status-col"/>
           </colgroup>
-          <thead>
+          <thead ref={tableHead}>
             <tr>
               <th scope="col" aria-sort={order === 'type-field' ? 'ascending' : undefined}>Тип</th>
               <th scope="col" aria-sort={order === 'date' ? 'ascending' : undefined}>Поле</th>
@@ -157,8 +180,11 @@ export function SchemaCoverageTable({
           <tbody>
             {visibleFields.map(({type, field, id}) => {
               const selected = id === selectedField;
+              const inSelectedType = selectedField === null && type === selectedType;
               return (
-                <tr key={id} className={selected ? 'selected' : undefined} onClick={() => onField(type, field.name)}>
+                <tr key={id} ref={id === firstTypeField ? firstTypeRow : undefined}
+                  className={selected ? 'selected' : inSelectedType ? 'selected-type' : undefined}
+                  onClick={() => onField(type, field.name)}>
                   <td className="schema-table-type">{type}</td>
                   <td><button type="button" className="schema-table-field" aria-pressed={selected} onClick={event => {
                     event.stopPropagation();

@@ -57,7 +57,7 @@
 }
 [data-theme="dark"] :is(.workspace-context,.settings-context,.snapshot-import-file,.snapshot-import-info,
 .run-dialog-context,.snapshot-import-methods,.schema-detail-stats,.code-view,.active-filter,.coverage-chip,
-.schema-detail-breadcrumb,.summary-track,.node-progress,.schema-empty-hint,.panel-tools,.segmented,.schema-panel-tools .segmented) {
+.summary-track,.node-progress,.schema-empty-hint,.panel-tools,.segmented,.schema-panel-tools .segmented) {
   background:var(--raised-surface); color:var(--ink); border-color:var(--border);
 }
 [data-theme="dark"] :is(.schema-list,.schema-explorer,.content-panel,.detail-panel,.context-menu,.auth-account-panel,.create-service-dialog)
@@ -69,6 +69,11 @@
   color:var(--secondary);
 }
 [data-theme="dark"] :is(.top-brand strong,.context-trigger strong,.run-history-select,.type-node header strong) {color:var(--ink)}
+[data-theme="dark"] .type-node.selected {
+  border:1px solid #8fbcff;
+  outline:1px solid #8fbcff;
+  box-shadow:0 0 0 3px #72a8ff33;
+}
 [data-theme="dark"] :is(input:not([type=checkbox],[type=radio]), textarea, select,
 .workspace-context .context-trigger,.run-control,.auth-trigger,.detail-head button,
 .create-service-actions button,.schema-panel-tools .schema-view-actions>button,.schema-panel-tools .segmented button,
@@ -124,6 +129,12 @@
   background:var(--primary-soft);color:var(--ink);
 }
 [data-theme="dark"] .schema-coverage-table tr.selected .schema-table-field {color:var(--primary)}
+[data-theme="dark"] .schema-panel-tools .schema-view-actions>button.schema-clear-selection:hover {
+  background:var(--hover-surface);color:var(--text);border-color:var(--focus-ring);
+}
+[data-theme="dark"] .schema-panel-tools .schema-view-actions>button.schema-clear-selection:active {
+  background:var(--selected-surface);
+}
 [data-theme="dark"] .schema-table-status {color:#ffda96;background:#443626}
 [data-theme="dark"] .schema-table-status.covered {color:#86e4bc;background:#194036}
 [data-theme="dark"] .create-service-dialog :is(p.form-error,.auth-error) {color:#ffbac1;background:#442b3c}

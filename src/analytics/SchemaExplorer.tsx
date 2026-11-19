@@ -3,11 +3,11 @@ import type {GraphType} from '../model';
 import {explorerResults,type CoverageFilter,type ExplorerSort,type RootFilter} from './explorer';
 import './explorer.css';
 
-type Props={types:GraphType[];coverageAvailable?:boolean;emptyMessage?:string;selectedType:string|null;selectedField:string|null;coverageRequest?:number;onType:(name:string)=>void;onField:(type:string,field:string)=>void;onClear:()=>void;onOverview:()=>void};
+type Props={types:GraphType[];coverageAvailable?:boolean;emptyMessage?:string;selectedType:string|null;selectedField:string|null;coverageRequest?:number;onType:(name:string)=>void;onField:(type:string,field:string)=>void};
 const coverageOptions:{id:CoverageFilter;label:string}[]=[{id:'all',label:'Все'},{id:'zero',label:'0%'},{id:'partial',label:'1–99%'},{id:'complete',label:'100%'}];
 const rootOptions:{id:RootFilter;label:string}[]=[{id:'all',label:'Все'},{id:'query',label:'Query'},{id:'mutation',label:'Mutation'}];
 
-export function SchemaExplorer({types,coverageAvailable=true,emptyMessage,selectedType,selectedField,coverageRequest=0,onType,onField,onClear,onOverview}:Props){
+export function SchemaExplorer({types,coverageAvailable=true,emptyMessage,selectedType,selectedField,coverageRequest=0,onType,onField}:Props){
  const [collapsed,setCollapsed]=useState(false);
  const [filtersOpen,setFiltersOpen]=useState(false);
  const [search,setSearch]=useState('');
@@ -38,7 +38,6 @@ export function SchemaExplorer({types,coverageAvailable=true,emptyMessage,select
     {objects.length>0&&renderGroup(objects.every(({type})=>type.kind==='OBJECT')?'Объектные типы':'Другие типы',objects)}
     {results.length===0&&<p className="explorer-empty">{types.length?'Совпадений нет. Измените поиск или фильтры.':emptyMessage??'Снимков схемы пока нет. Добавьте снимок в верхней панели.'}</p>}
    </div>
-   {(selectedType||selectedField)&&<div className="explorer-actions"><button type="button" onClick={onClear}>Сбросить выделение</button><button type="button" className="overview" onClick={onOverview}>Общий обзор</button></div>}
   </>}
  </aside>;
 }

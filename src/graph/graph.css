@@ -2,3 +2,10 @@
 .react-flow__handle.source{background:#7f69ac!important;border:2px solid #fff!important;width:9px!important;height:9px!important}
 .react-flow__handle.target{background:#fff!important;border:2px solid #8b70bf!important;width:9px!important;height:9px!important}
 .react-flow__edge-path{transition:stroke .12s ease,opacity .12s ease,stroke-width .12s ease}
+.schema-node-dimmed .react-flow__handle{pointer-events:none}
+.react-flow__edge.schema-edge-dimmed,
+.react-flow__edge.schema-edge-dimmed *{pointer-events:none!important}
+.type-node .node-field.path-field{background:var(--selected-surface);box-shadow:inset 3px 0 var(--primary)}
+.type-node > header{border-top-left-radius:inherit;border-top-right-radius:inherit}
+.type-node > .node-fields{border-radius:inherit}
+.type-node > .node-fields > .node-field:last-child{border-bottom-left-radius:inherit;border-bottom-right-radius:inherit}

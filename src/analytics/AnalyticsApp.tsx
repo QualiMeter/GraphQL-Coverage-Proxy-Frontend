@@ -1,5 +1,5 @@
 import {useMemo,useState,useCallback,useEffect,useRef} from 'react';
-import {ReactFlow,ReactFlowProvider,Background,MarkerType,useReactFlow,useNodesInitialized,type Edge,type NodeChange} from '@xyflow/react';
+import {ReactFlow,ReactFlowProvider,Background,MarkerType,useReactFlow,useNodesInitialized,type Edge,type NodeChange,type Viewport} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {fieldId, type GraphType} from '../model';
 import {graphEdges,layout} from '../graph/transform';
@@ -33,15 +33,15 @@ import {BackendTests} from './BackendTests';
 import {defaultTestView,testContextValue,testJournalNavigation,type ContextualTest,type TestListView} from './testCoverageModel';
 import type {ExecutionOut} from '../api/testCoverage';
 import {analyticsError, mayReadJournal} from './runAnalyticsModel';
-import {readWorkspace, saveWorkspace} from './workspaceSelection';
+import {readWorkspace, saveWorkspace, rememberRun, workspaceOwner} from './workspaceSelection';
+import {useAutoRunSelection} from './useAutoRunSelection';
 import {BackendRunHistory} from './BackendRunHistory';
 import {RunComparison} from './RunComparison';
 import type {CiListContext} from './RunHistoryFilters';
 import {ExportWorkspace} from './ExportWorkspace';
 import {ExportCenter} from './ExportCenter';
-import {launchGitlab,gitlabErrorRunId,type GitlabPipeline} from '../api/gitlab';
+import {gitlabCodeMessage,gitlabErrorMessage,launchGitlab,gitlabErrorRunId,type GitlabPipeline} from '../api/gitlab';
 import {useGitlabPipeline} from './useGitlabPipeline';
-import {GitlabRunStatus} from './GitlabRunStatus';
 import type {SchemaCoordinate} from '../api/runPaths';
 import {pathSearchNavigation,pathForContext,type RequestPathSelection} from './pathSearchNavigation';
 import {sameGitlabContext,type GitlabContext} from './gitlabContext';
@@ -57,8 +57,7 @@ import './profileAdmin.css';
 type Page='schema'|'operations'|'requests'|'tests'|'history';
 type RequestFilter='all'|'http'|'graphql'|'analyzer';
 const emptyGraphTypes:GraphType[]=[];
-function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useRef(saved?.runId??null);const [serviceId,setServiceId]=useState(saved?.serviceId??''),[snapshotId,setSnapshotId]=useState(saved?.snapshotId??''),[page,setPage]=useState<Page>('schema'),[mode,setMode]=useState<'graph'|'table'>('graph'),[fieldFilter,setFieldFilter]=useState<CoverageFilter>('all'),[query,setQuery]=useState(''),[requestFilter,setRequestFilter]=useState<RequestFilter>('all'),[requestField,setRequestField]=useState(''),[requestOperation,setRequestOperation]=useState(''),[operationField,setOperationField]=useState(''),[sort,setSort]=useState('date'),[detail,setDetail]=useState<{kind:'type'|'field';id:string}|null>(null),[schemaHistory,setSchemaHistory]=useState<InvestigationHistory>(emptyHistory),[explorerRequest,setExplorerRequest]=useState(0),[message,setMessage]=useState('');const flow=useReactFlow();
- const auth=useAuth();
+function Inner({auth,owner}:{auth:ReturnType<typeof useAuth>;owner:string}){const [saved]=useState(()=>readWorkspace(owner));const [serviceId,setServiceId]=useState(saved?.serviceId??''),[snapshotId,setSnapshotId]=useState(saved?.snapshotId??''),[page,setPage]=useState<Page>('schema'),[mode,setMode]=useState<'graph'|'table'>('graph'),[fieldFilter,setFieldFilter]=useState<CoverageFilter>('all'),[query,setQuery]=useState(''),[requestFilter,setRequestFilter]=useState<RequestFilter>('all'),[requestField,setRequestField]=useState(''),[requestOperation,setRequestOperation]=useState(''),[operationField,setOperationField]=useState(''),[sort,setSort]=useState('date'),[detail,setDetail]=useState<{kind:'type'|'field';id:string}|null>(null),[schemaHistory,setSchemaHistory]=useState<InvestigationHistory>(emptyHistory),[explorerRequest,setExplorerRequest]=useState(0),[message,setMessage]=useState('');const flow=useReactFlow();
  const [selectedTest,setSelectedTest]=useState<ContextualTest<string>|null>(null);
  const [testJournal,setTestJournal]=useState<ContextualTest<string>|null>(null);
  const [testListView,setTestListView]=useState<ContextualTest<TestListView>|null>(null);
@@ -106,32 +105,20 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
  const [coverageVersion,setCoverageVersion]=useState(0);
  const {coverage:runCoverage,stats,scope:analysisScope,revision:analysisRevision,refresh:refreshRunAnalytics}=
   useRunAnalytics(apiRun,schemaId,`${graphScope}:${coverageVersion}`);
- const [restoreEnded,setRestoreEnded]=useState(false);
- const restoreTarget=schemaId===saved?.snapshotId&&serviceId===saved?.serviceId?saved?.runId:null;
+ const autoRun=useAutoRunSelection({owner,serviceId:remoteService?.id??null,scope:serviceScope,snapshots:remote.items,
+  ready:remoteList.kind==='ready',enabled:!auth.pending,onResolve:run=>{
+   setSnapshotId(run?.snapshotId??remote.items[0]?.id??'');
+   setApiRunSelection(run?{scope:serviceScope,run}:null);
+  }});
  useEffect(()=>{
-  if(!restoreTarget||!schemaId||pendingRestore.current!==restoreTarget)return;
-  const controller=new AbortController();
-  void findRun(schemaId,restoreTarget,controller.signal).then(restored=>{
-   if(controller.signal.aborted||pendingRestore.current!==restoreTarget)return;
-   pendingRestore.current=null;
-   if(restored)setApiRunSelection({scope:serviceScope,run:restored});
-   setRestoreEnded(true);
-  },(error:Error)=>{
-   if(controller.signal.aborted||pendingRestore.current!==restoreTarget)return;
-   pendingRestore.current=null;
-   setMessage(analyticsError(error));
-   setRestoreEnded(true);
-  });
-  return ()=>controller.abort();
- },[restoreTarget,schemaId,serviceScope]);
- useEffect(()=>{
-  if((!schemaId||pendingRestore.current&&!restoreEnded&&schemaId===saved?.snapshotId))return;
-  saveWorkspace({serviceId,snapshotId:schemaId,runId:apiRun?.id??null});
- },[serviceId,schemaId,apiRun?.id,restoreEnded,saved?.snapshotId]);
+  if(!autoRun.resolved||auth.pending||!schemaId)return;
+  saveWorkspace({serviceId,snapshotId:schemaId,runId:apiRun?.id??null},owner);
+ },[serviceId,schemaId,apiRun?.id,autoRun.resolved,auth.pending,owner]);
  const [backendNavigation,setBackendNavigation]=useState(0);
  const [backendOperationKey,setBackendOperationKey]=useState('');
  const refreshContext=async()=>{
   if(!apiRun){
+   if(autoRun.error)autoRun.retry();
    if(schemaId)remote.graph.retry();
    else remote.snapshots.retry();
    setHistoryVersion(value=>value+1);
@@ -161,9 +148,17 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
   void findRun(schemaId,pipeline.runId,signal).then(next=>{
    if(signal.aborted||!next||!sameGitlabContext(gitlabContext,gitlabContextRef.current))return;
    if(apiRun?.id===next.id)setApiRunSelection({scope:serviceScope,run:next});
-   else chooseApiRun(next);
+   else chooseApiRun(next,false);
   },error=>{if(!signal.aborted&&sameGitlabContext(gitlabContext,gitlabContextRef.current))setMessage(analyticsError(error))});
  },pendingGitlab?.runId===trackedRunId?pendingGitlab.pipeline:undefined,pendingGitlab?.runId===trackedRunId);
+ const [dismissedGitlabNotice,setDismissedGitlabNotice]=useState<string|null>(null);
+ const gitlabNotices=[
+  gitlab.error&&gitlabErrorMessage(gitlab.error),
+  gitlab.data?.errorCode&&gitlabCodeMessage(gitlab.data.errorCode),
+  gitlab.data?.collectionIncomplete&&'Неполный сбор. Сохранённые обращения доступны, но не представляют полный результат.',
+ ].filter(Boolean).join(' ');
+ const gitlabNoticeKey=JSON.stringify([serviceScope,schemaId,trackedRunId,gitlabNotices]);
+ const showGitlabNotice=!adminOpen&&!comparisonOpen&&trackedRunId&&gitlabNotices&&gitlabNoticeKey!==dismissedGitlabNotice;
  const finalGitlabRefresh=useRef<string|null>(null);
  useEffect(()=>{
   const pipeline=gitlab.data;
@@ -184,7 +179,7 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
  const sdlMessage=remoteSdl.state.kind==='error'?remoteSdl.state.error.message:
   remoteSdl.state.kind==='loading'?'Загружаем SDL…':undefined;
  const schemaError=remoteList.kind==='error'?remoteList.error:remoteGraph.kind==='error'?remoteGraph.error:null;
- const readErrorStatus=runCoverage.error?.status??(stats.error instanceof ApiError?stats.error.status:undefined)??schemaError?.status??(remoteSdl.state.kind==='error'?remoteSdl.state.error.status:undefined)??(gitlab.error instanceof ApiError?gitlab.error.status:undefined);
+ const readErrorStatus=(autoRun.error instanceof ApiError?autoRun.error.status:undefined)??runCoverage.error?.status??(stats.error instanceof ApiError?stats.error.status:undefined)??schemaError?.status??(remoteSdl.state.kind==='error'?remoteSdl.state.error.status:undefined)??(gitlab.error instanceof ApiError?gitlab.error.status:undefined);
  useEffect(()=>{if(session&&readErrorStatus===401)void restore()},[session,readErrorStatus,restore]);
 
  const coverageNotice=runCoverage.loading
@@ -219,7 +214,6 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
  },[auth.revision,resetSchemaNavigation,resetSchemaFilters]);
  const selectService=useCallback((id:string)=>{
   if(id===serviceId)return;
-  pendingRestore.current=null;
   setServiceId(id);
   setComparisonOpen(false);
   setApiRunSelection(null);
@@ -271,12 +265,11 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
   if(catalog.state.kind!=='ready')return;
   const next=availableServiceId(serviceId,catalog.services);
   if(next===serviceId)return;
-  pendingRestore.current=null;
   selectService(next);
  },[catalog.state,catalog.services,serviceId,selectService]);
  const chooseSnapshot=(id:string)=>{
   if(id===schemaId||!snapshots.some(item=>item.id===id))return;
-  pendingRestore.current=null;
+  autoRun.cancel();
   setSnapshotId(id);
   setApiRunSelection(null);
   setFinishRequest(null);
@@ -290,7 +283,7 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
  const openField=(t:string,f:string)=>navigateSchema('field',fieldId(t,f));
  const openType=(t:string,edgeId:string|null=null)=>navigateSchema('type',t,edgeId);
  const travelSchema=(direction:-1|1)=>{const next=moveStep(updateStep(schemaHistory,{viewport:flow.getViewport()}),direction);if(next===schemaHistory||next.index===schemaHistory.index)return;setSchemaHistory(next);const step=currentStep(next)!;setDetail({kind:step.kind,id:step.id});setMode('graph');requestAnimationFrame(()=>requestAnimationFrame(()=>{void flow.setViewport(step.viewport,{duration:300})}))};
- const changeSchemaTab=(tab:'Обзор'|'Связи'|'SDL')=>setSchemaHistory(old=>updateStep(old,{tab}));
+ const changeSchemaTab=(tab:'Обзор'|'Связи'|'SDL'|'Тесты'|'Пути')=>setSchemaHistory(old=>updateStep(old,{tab}));
  const goOperations=(field:string)=>{setBackendNavigation(value=>value+1);setBackendOperationKey('');setPage('operations');setOperationField(field);setQuery('');setDetail(null)};
  const goRequests=(filter:RequestFilter='all',field='',operation='')=>{setTestJournal(null);setRequestPath(null);setBackendNavigation(value=>value+1);setPage('requests');setRequestFilter(filter);setRequestField(field);setRequestOperation(operation);setSort('date');setQuery('');setDetail(null)};
  const findRequestsForPath=(path:SchemaCoordinate[])=>{if(!apiRun||!schemaId||!path.length)return;const next=pathSearchNavigation(serviceScope,apiRun.id,schemaId,path);goRequests('all',next.field);setRequestPath(next)};
@@ -342,11 +335,14 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
    throw error;
   }
  };
- const chooseApiRun=(next:RunOut)=>{
+ const chooseApiRun=(next:RunOut,explicit=true)=>{
+  const current=auth.getCurrent();
+  if(current.pending||current.revision!==auth.revision)return;
   setComparisonOpen(false);
   const selection=remoteService?runSelectionForHistory(next,serviceScope,remote.items):null;
   if(!selection)return;
-  pendingRestore.current=null;
+  autoRun.cancel();
+  if(explicit)rememberRun(owner,serviceId,{runId:next.id,snapshotId:next.snapshotId});
   if(schemaId!==next.snapshotId)chooseSnapshot(next.snapshotId);
   if(apiRun?.id!==next.id){setSelectedTest(null);setTestJournal(null);setTestListView(null);setRequestPath(null);setCoverageVersion(version=>version+1);setOperationField('');setRequestField('');setRequestOperation('');setRequestFilter('all');setBackendOperationKey('');}
   setApiRunSelection(selection);
@@ -382,7 +378,8 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
   const context=gitlabContext;
   async function adopt(runId:string,pipeline?:GitlabPipeline){
    if(!sameGitlabContext(context,gitlabContextRef.current)||auth.getCurrent().revision!==current.revision)return;
-   pendingRestore.current=null;
+   autoRun.cancel();
+   rememberRun(owner,serviceId,{runId,snapshotId:context.snapshotId!});
    setApiRunSelection(null);
    setKnownGitlab({context,runId,pipeline});
    refreshHistory();
@@ -449,6 +446,21 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
  const [nodePositions,setNodePositions]=useState<Record<string,{x:number;y:number}>>({});
  const [nodeMeasurements,setNodeMeasurements]=useState<Record<string,{width:number;height:number}>>({});
  const onNodesChange=useCallback((changes:NodeChange<TypeFlowNode>[])=>{const key=(id:string)=>(schemaId??'')+':'+id;const positions=changes.filter(c=>c.type==='position'&&c.position);if(positions.length)setNodePositions(old=>{const next={...old};for(const change of positions)if(change.type==='position'&&change.position)next[key(change.id)]=change.position;return next});const dimensions=changes.filter(c=>c.type==='dimensions'&&c.dimensions);if(dimensions.length)setNodeMeasurements(old=>{const next={...old};let changed=false;for(const change of dimensions)if(change.type==='dimensions'&&change.dimensions){const id=key(change.id),size=change.dimensions;if(next[id]?.width!==size.width||next[id]?.height!==size.height){next[id]=size;changed=true}}return changed?next:old})},[schemaId]);
+ const pathHighlightContext=JSON.stringify([serviceScope,schemaId,apiRun?.id,page,detail,schemaHistory.index]);
+ const [highlightedPath,setHighlightedPath]=useState<{context:string;path:SchemaCoordinate[]}|null>(null);
+ const activePath=highlightedPath?.context===pathHighlightContext?highlightedPath.path:null;
+ const highlightPath=useCallback((path:SchemaCoordinate[]|null)=>{
+  setHighlightedPath(path?{context:pathHighlightContext,path}:null);
+  setHoveredField(null);
+ },[pathHighlightContext]);
+ useEffect(()=>{
+  if(!activePath||mode!=='graph'||!nodesReady)return;
+  const frame=requestAnimationFrame(()=>{void flow.fitView({
+   nodes:[...new Set(activePath.map(step=>step.typeName))].map(id=>({id})),
+   padding:.2,maxZoom:1,duration:420,
+  })});
+  return ()=>cancelAnimationFrame(frame);
+ },[activePath,mode,nodesReady,flow]);
  const graph=useMemo(()=>{
   if(!graphTypes.length)return {nodes:[] as TypeFlowNode[],edges:[] as Edge[]};
   const positions=layout({types:graphTypes}),relations=graphEdges({types:graphTypes});
@@ -465,27 +477,47 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
   if(activeType){visibleNodes.add(activeType);for(const edge of relations)if(edge.source===activeType||edge.target===activeType){visibleNodes.add(edge.source);visibleNodes.add(edge.target)}}
   if(sourceType){visibleNodes.add(sourceType);if(selectedRelation)visibleNodes.add(selectedRelation.target)}
   if(selectedEdgeId){const relation=relations.find(edge=>edge.id===selectedEdgeId);if(relation){visibleNodes.add(relation.source);visibleNodes.add(relation.target)}}
-  const nodes:TypeFlowNode[]=graphTypes.map(type=>({
-   id:type.name,type:'type',
-   position:nodePositions[(schemaId??'')+':'+type.name]??positions.find(node=>node.id===type.name)!.position,
-   measured:nodeMeasurements[(schemaId??'')+':'+type.name],
-   style:{opacity:hasSelection&&!visibleNodes.has(type.name)?.3:1},
-   data:{schemaType:type,incoming:incoming.get(type.name)??[],selectedType:activeType??sourceType,selectedField:activeField,selectedTarget:selectedRelation?.target??null,hoveredField,hoveredTarget:relations.find(edge=>edge.sourceHandle==='field:'+hoveredField)?.target??null,onType:openType,onField:openField,onHoverField:setHoveredField}
-  }));
+  const pathFields=activePath?.map(step=>fieldId(step.typeName,step.fieldName));
+  const pathEdges=new Set<string>();
+  if(activePath){
+   visibleNodes.clear();
+   for(const step of activePath)visibleNodes.add(step.typeName);
+   for(let index=0;index<activePath.length-1;index++){
+    const step=activePath[index],next=activePath[index+1];
+    const relation=relations.find(edge=>edge.source===step.typeName&&edge.sourceHandle==='field:'+fieldId(step.typeName,step.fieldName)&&edge.target===next.typeName);
+    if(relation)pathEdges.add(relation.id);
+   }
+  }
+  const nodes:TypeFlowNode[]=graphTypes.map(type=>{
+   const dimmed=hasSelection&&!visibleNodes.has(type.name);
+   return {
+    id:type.name,type:'type',
+    position:nodePositions[(schemaId??'')+':'+type.name]??positions.find(node=>node.id===type.name)!.position,
+    measured:nodeMeasurements[(schemaId??'')+':'+type.name],
+    draggable:!dimmed,
+    className:dimmed?'schema-node-dimmed':undefined,
+    style:{opacity:dimmed?.3:1},
+    data:{pathFields,schemaType:type,incoming:incoming.get(type.name)??[],selectedType:activeType??sourceType,selectedField:activeField,selectedTarget:activePath?null:selectedRelation?.target??null,hoveredField,hoveredTarget:activePath?null:relations.find(edge=>edge.sourceHandle==='field:'+hoveredField)?.target??null,onType:openType,onField:openField,onHoverField:setHoveredField}
+   };
+  });
   const edges:Edge[]=relations.map((edge,index)=>{
    const field=edge.sourceHandle.replace('field:','');
-   const selected=selectedEdgeId?edge.id===selectedEdgeId:activeField?activeField===field:activeType?edge.source===activeType||edge.target===activeType:false;
-   const hovered=hoveredField===field;
+   const selected=activePath?pathEdges.has(edge.id):selectedEdgeId?edge.id===selectedEdgeId:activeField?activeField===field:activeType?edge.source===activeType||edge.target===activeType:false;
+   const hovered=!activePath&&hoveredField===field;
    const dimmed=!hovered&&(hasSelection?!selected:Boolean(hoveredField));
    const stroke=selected||hovered?'var(--graph-edge-active)':edge.covered?'var(--graph-edge-covered)':'var(--graph-edge-muted)';
-   return {id:edge.id,source:edge.source,target:edge.target,sourceHandle:edge.sourceHandle,targetHandle:'target:'+edge.id,ariaLabel:edge.covered===undefined?undefined:`${field} → ${edge.target}: ${edge.covered?'Покрыто':'Не покрыто'}`,type:'routed',data:{offset:(index%4)*6,obstacles:boxes.filter(box=>box.id!==edge.source&&box.id!==edge.target)},markerEnd:{type:MarkerType.ArrowClosed,width:12,height:12,color:stroke},style:{stroke,strokeWidth:selected||hovered?2.4:1.25,opacity:dimmed?.14:1}};
+   return {id:edge.id,source:edge.source,target:edge.target,sourceHandle:edge.sourceHandle,targetHandle:'target:'+edge.id,ariaLabel:edge.covered===undefined?undefined:`${field} → ${edge.target}: ${edge.covered?'Покрыто':'Не покрыто'}`,type:'routed',className:dimmed?'schema-edge-dimmed':undefined,focusable:!dimmed,selectable:!dimmed,data:{offset:(index%4)*6,obstacles:boxes.filter(box=>box.id!==edge.source&&box.id!==edge.target)},markerEnd:{type:MarkerType.ArrowClosed,width:12,height:12,color:stroke},style:{stroke,strokeWidth:selected||hovered?2.4:1.25,opacity:dimmed?.14:1}};
   });
   return {nodes,edges};
- },[graphTypes,detail,hoveredField,nodePositions,nodeMeasurements,schemaId,schemaHistory]);
+ },[graphTypes,detail,hoveredField,nodePositions,nodeMeasurements,schemaId,schemaHistory,activePath]);
  const focusExplorer=(typeName:string,fieldName?:string,edgeId?:string)=>{if(fieldName)openField(typeName,fieldName);else openType(typeName,edgeId);setMode('graph')};
- const clearExplorerSelection=()=>{setDetail(null);setHoveredField(null)};
- const showOverview=()=>{clearExplorerSelection();setMode('graph');requestAnimationFrame(()=>requestAnimationFrame(()=>{void flow.fitView({padding:.12,minZoom:.3,maxZoom:1,duration:420})}))};
+ const clearSchemaSelection=()=>{setDetail(null);setHoveredField(null)};
  const viewKey=`backend:${graphScope}:${schemaId??'none'}`;
+ const savedViewport=useRef<{key:string;viewport:Viewport}>(null);
+ const showTable=()=>{
+  if(mode==='graph')savedViewport.current={key:viewKey,viewport:flow.getViewport()};
+  setMode('table');
+ };
  useEffect(()=>{
   if(page!=='schema'||mode!=='graph'||!schemaId||!nodesReady||!graph.nodes.length||
     !graph.nodes.every(node=>node.measured)||fittedSnapshot.current===viewKey)return;
@@ -507,7 +539,13 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
    onClearContext={()=>{if(page==='operations')setOperationField('');else {setTestJournal(null);setRequestPath(null);setRequestField('');setRequestOperation('')}}}
    />;
  })();
- return <ExportWorkspace key={JSON.stringify([serviceScope,serviceId,schemaId,apiRun?.id])}><div className="analytics-app"><TopChrome exportControl={<ExportCenter runId={apiRun?.id} snapshotId={schemaId??undefined} serviceId={serviceId} role={session?.user.role} csrfToken={session?.csrfToken} comparisonMode={comparisonOpen} testFilters={activeTestView.query}/>} onGitlab={submitGitlabRun} gitlabManaged={Boolean(gitlab.data)||Boolean(pendingGitlab&&pendingGitlab.runId===trackedRunId)} gitlabChecking={gitlab.loading} showSummary={!comparisonOpen&&page!=='tests'} adminOpen={adminOpen} onAdmin={()=>setAdminRevision(auth.revision)} canFinish={canFinishRun&&gitlab.canFinish} coverageRefreshing={runCoverage.loading} contextRefreshing={!apiRun&&(remote.graph.refreshing||remote.snapshots.refreshing)} intent={intent} onAction={requestAction} onCloseAction={closeAction} auth={auth} catalog={catalog} serviceId={serviceId} snapshots={snapshots} snapshot={selectedSnapshot} snapshotStatus={snapshotStatus} apiRun={apiRun} onCreateRun={submitApiRun} onFinishRun={()=>{if(gitlab.canFinish&&apiRun?.status==='running')setFinishRequest({scope:serviceScope,run:apiRun})}} backendStats={stats.data} statsLoading={stats.loading} summaryErrors={summaryErrors} onRefresh={refreshContext} onRefreshSummary={refreshRunAnalytics} coverage={coverageSummary} schemaFieldCount={coverageSummary?.totalFields??snapshotGraph?.summary.totalFields??null} page={page} onService={chooseService} onCreateService={submitService} onEditService={submitServiceEdit} onSnapshot={chooseSnapshot} onImport={importSnapshot} onRenameSnapshot={submitSnapshotName} snapshotDisplayName={remote.selected?.displayName} onPage={next=>{setComparisonOpen(false);if(next==='operations'){goOperations('');return}if(next==='requests'){goRequests();return}if(next==='tests'){openTests();return}setPage(next);setQuery('');setDetail(null);setSort('date')}} onMetric={summaryAction}/>{!adminOpen&&!comparisonOpen&&trackedRunId&&<GitlabRunStatus state={gitlab} requests={apiRun?.id===trackedRunId?stats.data?.totalRequests:undefined} coverage={apiRun?.id===trackedRunId?runCoverage.data?.summary.coveragePercent:null}/>} {message&&<div className="toast" role="status">{message}<button onClick={()=>setMessage('')}>×</button></div>}{adminOpen?<AdminUsers key={auth.revision} auth={auth} services={catalog.services.filter(service=>service.source==='backend')} onClose={()=>setAdminRevision(null)}/>:<main className={`analytics-main page-${comparisonOpen?'comparison':page}`} aria-labelledby={comparisonOpen?undefined:`analytics-section-${page}`} aria-label={comparisonOpen?'Сравнение прогонов':undefined}>{page==='history'&&!comparisonOpen&&<div className="view-heading"><h1 id="analytics-section-history">История прогонов</h1></div>}<div className="view-body">{comparisonOpen&&remoteService?<RunComparison key={JSON.stringify([serviceScope,schemaId])} snapshots={snapshots} initialSnapshotId={schemaId} session={session} initialFilters={comparisonSeed?.scope===serviceScope&&comparisonSeed.serviceId===serviceId?comparisonSeed:undefined} onBack={()=>setComparisonOpen(false)}/>:page==='history'&&remoteService
+ return <ExportWorkspace key={JSON.stringify([serviceScope,serviceId,schemaId,apiRun?.id])}><div className="analytics-app"><TopChrome runLoading={autoRun.loading} exportControl={<ExportCenter runId={apiRun?.id} snapshotId={schemaId??undefined} serviceId={serviceId} role={session?.user.role} csrfToken={session?.csrfToken} comparisonMode={comparisonOpen} testFilters={activeTestView.query}/>} onGitlab={submitGitlabRun} gitlabManaged={Boolean(gitlab.data)||Boolean(pendingGitlab&&pendingGitlab.runId===trackedRunId)} gitlabChecking={gitlab.loading} showSummary={!comparisonOpen&&page!=='tests'} adminOpen={adminOpen} onAdmin={()=>setAdminRevision(auth.revision)} canFinish={canFinishRun&&gitlab.canFinish} coverageRefreshing={runCoverage.loading} contextRefreshing={!apiRun&&(remote.graph.refreshing||remote.snapshots.refreshing)} intent={intent} onAction={requestAction} onCloseAction={closeAction} auth={auth} catalog={catalog} serviceId={serviceId} snapshots={snapshots} snapshot={selectedSnapshot} snapshotStatus={snapshotStatus} apiRun={apiRun} onCreateRun={submitApiRun} onFinishRun={()=>{if(gitlab.canFinish&&apiRun?.status==='running')setFinishRequest({scope:serviceScope,run:apiRun})}} backendStats={stats.data} statsLoading={stats.loading} summaryErrors={summaryErrors} onRefresh={refreshContext} onRefreshSummary={refreshRunAnalytics} coverage={coverageSummary} schemaFieldCount={coverageSummary?.totalFields??snapshotGraph?.summary.totalFields??null} page={page} onService={chooseService} onCreateService={submitService} onEditService={submitServiceEdit} onSnapshot={chooseSnapshot} onImport={importSnapshot} onRenameSnapshot={submitSnapshotName} snapshotDisplayName={remote.selected?.displayName} onPage={next=>{setComparisonOpen(false);if(next==='operations'){goOperations('');return}if(next==='requests'){goRequests();return}if(next==='tests'){openTests();return}setPage(next);setQuery('');setDetail(null);setSort('date')}} onMetric={summaryAction}/>{autoRun.error&&<div className="content-panel" role="alert">Не удалось выбрать прогон: {analyticsError(autoRun.error)} <button type="button" onClick={autoRun.retry}>Повторить выбор прогона</button></div>}{message?<div className="toast" role="status">{message}<button onClick={()=>setMessage('')}>×</button></div>:showGitlabNotice&&
+  <div className="toast">
+   <span role={gitlab.error?'alert':'status'}>{gitlabNotices}</span>
+   {gitlab.error&&<button type="button" onClick={gitlab.retry}>Повторить чтение статуса</button>}
+   <button type="button" aria-label="Закрыть уведомление GitLab" onClick={()=>setDismissedGitlabNotice(gitlabNoticeKey)}>×</button>
+  </div>}
+ {adminOpen?<AdminUsers key={auth.revision} auth={auth} services={catalog.services.filter(service=>service.source==='backend')} onClose={()=>setAdminRevision(null)}/>:<main className={`analytics-main page-${comparisonOpen?'comparison':page}`} aria-labelledby={comparisonOpen?undefined:`analytics-section-${page}`} aria-label={comparisonOpen?'Сравнение прогонов':undefined}>{page==='history'&&!comparisonOpen&&<div className="view-heading"><h1 id="analytics-section-history">История прогонов</h1></div>}<div className="view-body">{comparisonOpen&&remoteService?<RunComparison key={JSON.stringify([serviceScope,schemaId])} snapshots={snapshots} initialSnapshotId={schemaId} session={session} initialFilters={comparisonSeed?.scope===serviceScope&&comparisonSeed.serviceId===serviceId?comparisonSeed:undefined} onBack={()=>setComparisonOpen(false)}/>:page==='history'&&remoteService
   ?<BackendRunHistory key={`${serviceScope}:${historyVersion}`} serviceId={remoteService.id} snapshots={snapshots}
     scope={serviceScope} signedIn={Boolean(session)} snapshotsReady={remoteList.kind!=='loading'} selectedId={apiRun?.id} onSelect={chooseApiRun} onCompare={context=>{setComparisonSeed({...context,scope:serviceScope,serviceId});setComparisonOpen(true)}}/>
   :testAnalytics?testAnalytics:realAnalytics?realAnalytics:(page!=='schema'||!remoteGraphData)?<div className="content-panel">
@@ -517,29 +555,38 @@ function Inner(){const [saved]=useState(readWorkspace);const pendingRestore=useR
     <p>{!remoteService&&catalog.state.kind==='error'?catalog.state.error.message:!remoteService?(catalog.state.kind==='loading'?'Загружаем сервисы API…':'Нет доступных сервисов API. Добавьте сервис, чтобы начать работу.'):remoteMessage}</p>
     {schemaError&&!runCoverage.loading&&<button type="button" onClick={remoteList.kind==='error'?remote.snapshots.retry:remote.graph.retry}>Повторить</button>}
    </div>}
- </div>:page==='schema'?<><SchemaExplorer key={viewKey} types={graphTypes} coverageAvailable={coverageAvailable} emptyMessage="В графе снимка нет типов." coverageRequest={explorerRequest} selectedType={detail?.kind==='type'?detail.id:detail?.kind==='field'?detail.id.split('.')[0]:null} selectedField={detail?.kind==='field'?detail.id:null} onType={name=>focusExplorer(name)} onField={(type,field)=>focusExplorer(type,field)} onClear={clearExplorerSelection} onOverview={showOverview}/><div className="content-panel">
+ </div>:page==='schema'?<><SchemaExplorer key={viewKey} types={graphTypes} coverageAvailable={coverageAvailable} emptyMessage="В графе снимка нет типов." coverageRequest={explorerRequest} selectedType={detail?.kind==='type'?detail.id:detail?.kind==='field'?detail.id.split('.')[0]:null} selectedField={detail?.kind==='field'?detail.id:null} onType={name=>focusExplorer(name)} onField={(type,field)=>focusExplorer(type,field)}/><div className="content-panel">
   <div className="panel-tools schema-panel-tools">
    <span>{graphTypes.length} типов · {graph.edges.length} связей</span>
    <div className="schema-view-actions">
+    {detail&&<button type="button" className="schema-clear-selection" onClick={clearSchemaSelection}>Сбросить выделение</button>}
     <div className="segmented" role="group" aria-label="Режим просмотра схемы">
      <button className={mode==='graph'?'active':''} aria-pressed={mode==='graph'} onClick={()=>setMode('graph')}>Граф</button>
-     <button className={mode==='table'?'active':''} aria-pressed={mode==='table'} onClick={()=>setMode('table')}>Таблица</button>
+     <button className={mode==='table'?'active':''} aria-pressed={mode==='table'} onClick={showTable}>Таблица</button>
     </div>
    </div>
   </div>
- {mode==='graph'?<><div className="flow-space">{!schemaId&&<div className="schema-empty-hint">Схем пока нет. Добавьте снимок через селектор в верхней панели.</div>}{!graphTypes.length&&<div className="schema-empty-hint">В графе снимка нет типов.</div>}<ReactFlow key={viewKey} nodes={graph.nodes} onNodesChange={onNodesChange} edges={graph.edges} onEdgeMouseEnter={(_,edge)=>setHoveredField(edge.sourceHandle?.replace(/^field:/,'')??null)} onEdgeMouseLeave={()=>setHoveredField(null)} onEdgeClick={(_,edge)=>{const field=edge.sourceHandle?.replace(/^field:/,'');if(!field)return;const dot=field.indexOf('.');if(dot>=0)openField(field.slice(0,dot),field.slice(dot+1))}} nodeTypes={{type:TypeNode}} edgeTypes={{routed:RoutedEdge}} nodesConnectable={false}><Background gap={18} color="var(--graph-dot)"/><GraphControls hasNodes={graph.nodes.length>0}/></ReactFlow></div></>:<SchemaCoverageTable
+ {mode==='graph'?<><div className="flow-space">{!schemaId&&<div className="schema-empty-hint">Схем пока нет. Добавьте снимок через селектор в верхней панели.</div>}{!graphTypes.length&&<div className="schema-empty-hint">В графе снимка нет типов.</div>}<ReactFlow key={viewKey} defaultViewport={savedViewport.current?.key===viewKey?savedViewport.current.viewport:undefined} nodes={graph.nodes} onNodesChange={onNodesChange} edges={graph.edges} onEdgeMouseEnter={(_,edge)=>setHoveredField(edge.sourceHandle?.replace(/^field:/,'')??null)} onEdgeMouseLeave={()=>setHoveredField(null)} onEdgeClick={(_,edge)=>{const field=edge.sourceHandle?.replace(/^field:/,'');if(!field)return;const dot=field.indexOf('.');if(dot>=0)openField(field.slice(0,dot),field.slice(dot+1))}} nodeTypes={{type:TypeNode}} edgeTypes={{routed:RoutedEdge}} nodesConnectable={false}><Background gap={18} color="var(--graph-dot)"/><GraphControls hasNodes={graph.nodes.length>0}/></ReactFlow></div></>:<SchemaCoverageTable
   key={viewKey}
   types={graphTypes}
   coverageAvailable={coverageAvailable}
   query={query}
   filter={fieldFilter}
   sort={sort}
+  selectedType={detail?.kind === 'type' ? detail.id : null}
   selectedField={detail?.kind === 'field' ? detail.id : null}
   onQuery={setQuery}
   onFilter={setFieldFilter}
   onSort={setSort}
   onField={openField}
- /> }</div></>:null}{page==='schema'&&(detail?.kind==='type'||detail?.kind==='field')&&<SchemaDetailPanel testRevision={analysisRevision} onTest={openTests} runId={apiRun?.id} snapshotId={schemaId} resourceScope={serviceScope} onFindPath={findRequestsForPath} showAnalyticsLinks={Boolean(apiRun)} canOpenRequests={mayReadJournal(session?.user.role)} types={graphTypes} snapshot={detailSnapshot} sdlMessage={sdlMessage} history={schemaHistory} onBack={()=>travelSchema(-1)} onForward={()=>travelSchema(1)} onClose={()=>setDetail(null)} onTab={changeSchemaTab} onType={(name,edgeId)=>focusExplorer(name,undefined,edgeId)} onField={(type,field)=>focusExplorer(type,field)} onOperations={goOperations} onRequests={field=>goRequests('all',field)}/>}</div></main>}{finishTarget&&<FinishRunDialog key={finishTarget.id} run={finishTarget} onFinish={completeApiRun} onClose={()=>setFinishRequest(null)}/>}</div></ExportWorkspace>}
+ /> }</div></>:null}{page==='schema'&&(detail?.kind==='type'||detail?.kind==='field')&&<SchemaDetailPanel onHighlightPath={highlightPath} testRevision={analysisRevision} onTest={openTests} runId={apiRun?.id} snapshotId={schemaId} resourceScope={serviceScope} onFindPath={findRequestsForPath} showAnalyticsLinks={Boolean(apiRun)} canOpenRequests={mayReadJournal(session?.user.role)} types={graphTypes} snapshot={detailSnapshot} sdlMessage={sdlMessage} history={schemaHistory} onBack={()=>travelSchema(-1)} onForward={()=>travelSchema(1)} onClose={clearSchemaSelection} onTab={changeSchemaTab} onType={(name,edgeId)=>focusExplorer(name,undefined,edgeId)} onField={(type,field)=>focusExplorer(type,field)} onOperations={goOperations} onRequests={field=>goRequests('all',field)}/>}</div></main>}{finishTarget&&<FinishRunDialog key={finishTarget.id} run={finishTarget} onFinish={completeApiRun} onClose={()=>setFinishRequest(null)}/>}</div></ExportWorkspace>}
 function Empty({text}:{text:string}){return <div className="empty-state">{text}</div>}
-export default function AnalyticsApp(){return <ReactFlowProvider><Inner/></ReactFlowProvider>}
+function AuthenticatedWorkspace(){
+ const auth=useAuth();
+ if(!auth.checked)return <div className="empty-state" role="status">Восстанавливаем сессию…</div>;
+ if(!auth.session&&auth.error)return <div className="empty-state" role="alert">Не удалось восстановить сессию. <button onClick={()=>void auth.restore()}>Повторить</button></div>;
+ const owner=workspaceOwner(auth.session?.user.id);
+ return <Inner key={owner} auth={auth} owner={owner}/>;
+}
+export default function AnalyticsApp(){return <ReactFlowProvider><AuthenticatedWorkspace/></ReactFlowProvider>}
 

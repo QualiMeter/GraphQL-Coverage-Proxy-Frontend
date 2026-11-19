@@ -37,12 +37,6 @@
 .explorer-field-dot{width:8px;height:8px;flex:none;border-radius:50%;background:#b8c0cd}
 .explorer-field-dot.covered{background:#2fa77a}
 .explorer-empty{font-size:13px;line-height:1.45;color:#7788a0;padding:8px 2px}
-.explorer-actions{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:9px 10px;border-top:1px solid #e8eef7;background:#fbfcff}
-.explorer-actions button{min-height:36px;border:1px solid #dce6f5;border-radius:8px;background:#fff;color:#4c6688;font-size:11px;font-weight:700;padding:5px 6px}
-.explorer-actions button:first-child{grid-column:1/-1}
-.explorer-actions button.overview{color:#3458d2;background:#eef3ff}
-.explorer-actions button:hover:not(:disabled){background:#e9efff}
-.explorer-actions button:disabled{opacity:.45;cursor:default}
 .schema-explorer.collapsed{width:52px}
 .schema-explorer.collapsed .explorer-head{height:100%;padding:12px 8px;flex-direction:column;justify-content:flex-start}
 .schema-explorer.collapsed .explorer-head div{order:2;writing-mode:vertical-rl;display:flex;align-items:center;margin-top:12px}
@@ -67,6 +61,3 @@
 .explorer-advanced .explorer-control-label{margin-top:0}
 .explorer-advanced .explorer-sort{display:block;margin-top:10px}
 .explorer-group{margin-top:13px}
-.explorer-actions{padding:9px;gap:6px}
-.explorer-actions button{min-height:36px}
-.explorer-actions button:first-child{grid-column:auto}

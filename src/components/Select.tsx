@@ -8,9 +8,11 @@ type SelectProps<Value extends string> = {
   value: Value;
   onChange: (value: Value) => void;
   modified?: boolean;
+  selectedValues?: readonly Value[];
+  summary?: string;
 };
 
-export function Select<Value extends string>({label, options, value, onChange, modified}: SelectProps<Value>) {
+export function Select<Value extends string>({label, options, value, onChange, modified,selectedValues,summary}: SelectProps<Value>) {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -43,7 +45,7 @@ export function Select<Value extends string>({label, options, value, onChange, m
 
   function choose(index: number) {
     onChange(options[index].value);
-    setPosition(null);
+    if(!selectedValues)setPosition(null);
   }
 
   useEffect(() => {
@@ -110,24 +112,25 @@ export function Select<Value extends string>({label, options, value, onChange, m
         onKeyDown={handleKey}
         onBlur={() => setPosition(null)}
       >
-        <span>{options[selected]?.label}</span>
+        <span>{summary??options[selected]?.label}</span>
         <span className="ui-select-chevron" aria-hidden="true"/>
       </button>
       {open && createPortal(
-        <div className="ui-select-menu" ref={menu} id={`${id}-list`} role="listbox" aria-labelledby={`${id}-label`} style={position}>
+        <div className="ui-select-menu" ref={menu} id={`${id}-list`} role="listbox" aria-multiselectable={selectedValues?true:undefined} aria-labelledby={`${id}-label`} style={position}>
           {options.map((option, index) => (
             <div
               role="option"
               key={option.value}
               id={optionId(index)}
-              aria-selected={index === selected}
+              aria-selected={selectedValues?selectedValues.includes(option.value):index === selected}
               data-highlighted={index === highlight}
               onPointerMove={() => setHighlight(index)}
               onMouseDown={event => event.preventDefault()}
               onClick={() => choose(index)}
             >
+              {selectedValues&&<input type="checkbox" readOnly tabIndex={-1} aria-hidden="true" checked={selectedValues.includes(option.value)}/>}
               {option.label}
-              {index === selected && <span aria-hidden="true">✓</span>}
+              {!selectedValues&&index === selected && <span aria-hidden="true">✓</span>}
             </div>
           ))}
         </div>,
